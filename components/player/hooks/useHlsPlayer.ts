@@ -323,6 +323,40 @@ export function useHlsPlayer({
                 processMasterPlaylist(src).then((result) => {
                     video.src = result.masterBlobUrl;
                     extraBlobs = result.allBlobs;
+
+                    // Some WebView-based browsers (Alook, Arthur, etc.) cannot play from blob: URLs.
+                    // Detect playback failure and fall back to the original source.
+                    let blobPlaybackFailed = false;
+
+                    const onBlobError = () => {
+                        if (blobPlaybackFailed) return;
+                        blobPlaybackFailed = true;
+                        console.warn('[HLS Native] Blob URL playback failed, falling back to original source.');
+                        video.removeEventListener('error', onBlobError);
+                        onError?.('当前浏览器不支持广告过滤，已回退到原始视频流');
+                        // Revoke blob URLs immediately
+                        extraBlobs.forEach(url => URL.revokeObjectURL(url));
+                        extraBlobs = [];
+                        video.src = src;
+                    };
+
+                    video.addEventListener('error', onBlobError);
+
+                    // Also set a timeout: if video hasn't started loading within 8s, fall back
+                    const fallbackTimer = setTimeout(() => {
+                        if (video.readyState === 0 && !blobPlaybackFailed) {
+                            console.warn('[HLS Native] Blob URL playback timed out, falling back to original source.');
+                            onBlobError();
+                        }
+                    }, 8000);
+
+                    // Clear the timeout once video starts loading
+                    const onLoadedData = () => {
+                        clearTimeout(fallbackTimer);
+                        video.removeEventListener('error', onBlobError);
+                        video.removeEventListener('loadeddata', onLoadedData);
+                    };
+                    video.addEventListener('loadeddata', onLoadedData);
                 }).catch((e) => {
                     console.warn('[HLS Native] Ad filtering failed, falling back to original source.', e);
                     onError?.('广告过滤失败，已回退到原始视频流');

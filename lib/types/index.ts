@@ -36,6 +36,7 @@ export interface VideoItem {
   vod_actor?: string;
   vod_director?: string;
   vod_content?: string;
+  vod_lang?: string;
   source: string;
   latency?: number; // Response time in milliseconds
 }
@@ -54,6 +55,11 @@ export interface SourceBadge {
 
 export interface TypeBadge {
   type: string;
+  count: number;
+}
+
+export interface LanguageBadge {
+  lang: string;
   count: number;
 }
 
@@ -76,6 +82,7 @@ export interface VideoDetail {
   vod_director?: string;
   vod_content?: string;
   type_name?: string;
+  vod_lang?: string;
   episodes: Episode[];
   source: string;
   source_code: string;
@@ -134,6 +141,7 @@ export interface ApiDetailResponse {
     vod_director?: string;
     vod_content?: string;
     type_name?: string;
+    vod_lang?: string;
     vod_play_from?: string;
     vod_play_url?: string;
   }>;

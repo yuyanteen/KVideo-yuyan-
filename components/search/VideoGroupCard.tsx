@@ -202,6 +202,11 @@ export const VideoGroupCard = memo<VideoGroupCardProps>(({
                                             {displayQuality}
                                         </p>
                                     )}
+                                    {representative.vod_lang && (
+                                        <p className="text-xs text-[var(--text-color-secondary)] mt-1">
+                                            {representative.vod_lang}
+                                        </p>
+                                    )}
                                 </>
                             );
                         })()}

@@ -10,6 +10,7 @@ import { DesktopControlsWrapper } from './desktop/DesktopControlsWrapper';
 import { DesktopOverlayWrapper } from './desktop/DesktopOverlayWrapper';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
 import { useIsIOS, useIsMobile } from '@/lib/hooks/mobile/useDeviceDetection';
+import { useDoubleTap } from '@/lib/hooks/mobile/useDoubleTap';
 import './web-fullscreen.css';
 
 interface DesktopVideoPlayerProps {
@@ -141,6 +142,7 @@ export function DesktopVideoPlayer({
 
   const {
     handleMouseMove,
+    handleTouchToggleControls,
     togglePlay,
     handlePlay,
     handlePause,
@@ -148,6 +150,28 @@ export function DesktopVideoPlayer({
     handleLoadedMetadata,
     handleVideoError,
   } = logic;
+
+  // Mobile double-tap gesture for skip forward/backward
+  const { handleTap } = useDoubleTap({
+    onSingleTap: handleTouchToggleControls,
+    onDoubleTapLeft: () => {
+      logic.skipBackward();
+      handleMouseMove(); // Reset 3s auto-hide timer
+    },
+    onDoubleTapRight: () => {
+      logic.skipForward();
+      handleMouseMove(); // Reset 3s auto-hide timer
+    },
+    onSkipContinueLeft: () => {
+      logic.skipBackward();
+      handleMouseMove();
+    },
+    onSkipContinueRight: () => {
+      logic.skipForward();
+      handleMouseMove();
+    },
+    isSkipModeActive: data.showSkipForwardIndicator || data.showSkipBackwardIndicator,
+  });
 
   return (
     <div
@@ -176,12 +200,10 @@ export function DesktopVideoPlayer({
             onError={handleVideoError}
             onWaiting={() => setIsLoading(true)}
             onCanPlay={() => setIsLoading(false)}
-            onClick={(e) => {
-              // Prevent native behavior on iOS
-              // e.preventDefault(); 
-              // React synthetic event doesn't always stop native video toggle on iOS, but good practice
+            onClick={!isMobile ? (e) => {
               togglePlay();
-            }}
+            } : undefined}
+            onTouchStart={isMobile ? handleTap : undefined}
             {...({ 'webkit-playsinline': 'true' } as any)} // Legacy iOS support
           />
 

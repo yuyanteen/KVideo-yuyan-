@@ -4,6 +4,7 @@ import { AddSourceModal } from '@/components/settings/AddSourceModal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { PremiumSourceSettings } from '@/components/settings/PremiumSourceSettings';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
+import { AdminGate } from '@/components/AdminGate';
 import { usePremiumSettingsPage } from './hooks/usePremiumSettingsPage';
 import Link from 'next/link';
 
@@ -23,6 +24,7 @@ export default function PremiumSettingsPage() {
     } = usePremiumSettingsPage();
 
     return (
+        <AdminGate>
         <div className="min-h-screen bg-black">
             <div className="container mx-auto px-4 py-8 max-w-4xl space-y-8">
                 {/* Custom Header for Secret Settings */}
@@ -81,5 +83,6 @@ export default function PremiumSettingsPage() {
                 onCancel={() => setIsRestoreDefaultsDialogOpen(false)}
             />
         </div>
+        </AdminGate>
     );
 }

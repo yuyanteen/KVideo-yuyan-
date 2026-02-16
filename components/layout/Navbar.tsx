@@ -1,8 +1,13 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Icons } from '@/components/ui/Icon';
 import { siteConfig } from '@/lib/config/site-config';
+import { getSession, clearSession, type AuthSession } from '@/lib/store/auth-store';
+import { LogOut } from 'lucide-react';
 
 interface NavbarProps {
     onReset: () => void;
@@ -11,6 +16,16 @@ interface NavbarProps {
 
 export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
     const settingsHref = isPremiumMode ? '/premium/settings' : '/settings';
+    const [session, setSessionState] = useState<AuthSession | null>(null);
+
+    useEffect(() => {
+        setSessionState(getSession());
+    }, []);
+
+    const handleLogout = () => {
+        clearSession();
+        window.location.reload();
+    };
 
     return (
         <nav className="sticky top-0 z-[2000] pt-4 pb-2" style={{
@@ -43,6 +58,30 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
                         </Link>
 
                         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                            {/* User Info */}
+                            {session && (
+                                <div className="hidden sm:flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-full)] text-xs">
+                                        <div className="w-5 h-5 rounded-[var(--radius-full)] bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)] font-bold text-[10px] border border-[var(--glass-border)]">
+                                            {session.name.charAt(0)}
+                                        </div>
+                                        <span className="text-[var(--text-color)] max-w-[60px] truncate">{session.name}</span>
+                                        {session.role === 'admin' && (
+                                            <span className="px-1 py-0.5 bg-[var(--accent-color)]/10 text-[var(--accent-color)] rounded text-[10px] font-medium">
+                                                管理
+                                            </span>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="w-8 h-8 sm:w-8 sm:h-8 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color-secondary)] hover:text-red-500 hover:border-red-500/30 transition-all duration-200 cursor-pointer"
+                                        aria-label="退出登录"
+                                        title="退出登录"
+                                    >
+                                        <LogOut size={14} />
+                                    </button>
+                                </div>
+                            )}
                             <a
                                 href="https://github.com/KuekHaoYang/KVideo"
                                 target="_blank"

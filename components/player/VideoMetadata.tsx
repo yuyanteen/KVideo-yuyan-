@@ -48,6 +48,12 @@ export function VideoMetadata({ videoData, source, title }: VideoMetadataProps) 
                 {videoData.vod_area}
               </Badge>
             )}
+            {videoData?.vod_lang && (
+              <Badge variant="secondary">
+                <Icons.Languages size={14} className="mr-1" />
+                {videoData.vod_lang}
+              </Badge>
+            )}
           </div>
           {videoData?.vod_content && (
             <p className="text-sm sm:text-base text-[var(--text-secondary)]">

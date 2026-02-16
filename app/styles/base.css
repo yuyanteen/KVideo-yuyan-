@@ -54,6 +54,7 @@ select:focus-visible {
 }
 
 ::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.5);
     background: color-mix(in srgb, var(--glass-bg) 80%, transparent);
     border-radius: var(--radius-full);
     border: 2px solid transparent;
@@ -61,6 +62,7 @@ select:focus-visible {
 }
 
 ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 122, 255, 0.6);
     background: color-mix(in srgb, var(--accent-color) 60%, transparent);
     background-clip: padding-box;
 }
@@ -74,6 +76,7 @@ select:focus-visible {
 }
 
 .search-history-dropdown::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.5);
     background: color-mix(in srgb, var(--glass-bg) 80%, transparent);
     border-radius: var(--radius-full);
 }
@@ -118,8 +121,13 @@ nav:where(.sticky, .fixed),
     animation: fadeInUp 0.2s ease-out;
 }
 
+@supports (content-visibility: auto) {
+    img {
+        content-visibility: auto;
+    }
+}
+
 img {
-    content-visibility: auto;
     transform: translateZ(0);
 }
 

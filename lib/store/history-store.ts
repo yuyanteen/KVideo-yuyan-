@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { VideoHistoryItem, Episode } from '@/lib/types';
 import { clearSegmentsForUrl, clearAllCache } from '@/lib/utils/cacheManager';
+import { profiledKey } from '@/lib/utils/profile-storage';
 
 const MAX_HISTORY_ITEMS = 50;
 
@@ -151,8 +152,8 @@ const createHistoryStore = (name: string) =>
     )
   );
 
-export const useHistoryStore = createHistoryStore('kvideo-history-store');
-export const usePremiumHistoryStore = createHistoryStore('kvideo-premium-history-store');
+export const useHistoryStore = createHistoryStore(profiledKey('kvideo-history-store'));
+export const usePremiumHistoryStore = createHistoryStore(profiledKey('kvideo-premium-history-store'));
 
 /**
  * Helper hook to get the appropriate history store

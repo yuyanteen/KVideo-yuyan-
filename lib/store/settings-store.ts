@@ -28,8 +28,6 @@ export interface AppSettings {
   sortBy: SortOption;
   searchHistory: boolean;
   watchHistory: boolean;
-  passwordAccess: boolean;
-  accessPasswords: string[];
   // Player settings
   autoNextEpisode: boolean;
   autoSkipIntro: boolean;
@@ -104,8 +102,6 @@ function getDefaultAppSettings(): AppSettings {
     sortBy: 'default',
     searchHistory: true,
     watchHistory: true,
-    passwordAccess: false,
-    accessPasswords: [],
     autoNextEpisode: true,
     autoSkipIntro: false,
     skipIntroSeconds: 0,
@@ -182,8 +178,6 @@ export const settingsStore = {
         sortBy: parsed.sortBy || 'default',
         searchHistory: parsed.searchHistory !== undefined ? parsed.searchHistory : true,
         watchHistory: parsed.watchHistory !== undefined ? parsed.watchHistory : true,
-        passwordAccess: parsed.passwordAccess !== undefined ? parsed.passwordAccess : false,
-        accessPasswords: Array.isArray(parsed.accessPasswords) ? parsed.accessPasswords : [],
         autoNextEpisode: parsed.autoNextEpisode !== undefined ? parsed.autoNextEpisode : true,
         autoSkipIntro: parsed.autoSkipIntro !== undefined ? parsed.autoSkipIntro : false,
         skipIntroSeconds: typeof parsed.skipIntroSeconds === 'number' ? parsed.skipIntroSeconds : 0,

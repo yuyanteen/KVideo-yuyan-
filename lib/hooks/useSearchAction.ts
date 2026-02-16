@@ -87,8 +87,11 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
                     // Optimized: Insert new videos in sorted position
                     setResults((prev) => binaryInsertVideos(prev, newVideos));
 
-                    // Update source stats
-                    if (!sourcesMap.has(sourceId)) {
+                    // Update source stats (accumulate across pages)
+                    const existing = sourcesMap.get(sourceId);
+                    if (existing) {
+                        existing.count += newVideos.length;
+                    } else {
                         sourcesMap.set(sourceId, {
                             count: newVideos.length,
                             name: newVideos[0]?.sourceName || sourceId,

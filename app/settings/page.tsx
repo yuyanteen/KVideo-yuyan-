@@ -1,6 +1,5 @@
 'use client';
 
-import { Suspense } from 'react';
 import { AddSourceModal } from '@/components/settings/AddSourceModal';
 import { ExportModal } from '@/components/settings/ExportModal';
 import { ImportModal } from '@/components/settings/ImportModal';
@@ -8,19 +7,17 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { SourceSettings } from '@/components/settings/SourceSettings';
 import { SortSettings } from '@/components/settings/SortSettings';
 import { DataSettings } from '@/components/settings/DataSettings';
-import { PasswordSettings } from '@/components/settings/PasswordSettings';
+import { AccountSettings } from '@/components/settings/AccountSettings';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
+import { AdminGate } from '@/components/AdminGate';
 import { useSettingsPage } from './hooks/useSettingsPage';
 
 export default function SettingsPage() {
   const {
     sources,
     sortBy,
-    passwordAccess,
-    accessPasswords,
-    envPasswordSet,
     realtimeLatency,
     searchDisplayMode,
     fullscreenType,
@@ -37,9 +34,6 @@ export default function SettingsPage() {
     handleSourcesChange,
     handleAddSource,
     handleSortChange,
-    handlePasswordToggle,
-    handleAddPassword,
-    handleRemovePassword,
     handleExport,
     handleImportFile,
     handleImportLink,
@@ -62,10 +56,14 @@ export default function SettingsPage() {
   } = useSettingsPage();
 
   return (
+    <AdminGate>
     <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
       <div className="container mx-auto px-4 py-8 max-w-4xl space-y-8">
         {/* Header */}
         <SettingsHeader />
+
+        {/* Account Settings */}
+        <AccountSettings />
 
         {/* Player Settings */}
         <PlayerSettings
@@ -73,16 +71,6 @@ export default function SettingsPage() {
           onFullscreenTypeChange={handleFullscreenTypeChange}
           proxyMode={proxyMode}
           onProxyModeChange={handleProxyModeChange}
-        />
-
-        {/* Password Settings */}
-        <PasswordSettings
-          enabled={passwordAccess}
-          passwords={accessPasswords}
-          envPasswordSet={envPasswordSet}
-          onToggle={handlePasswordToggle}
-          onAdd={handleAddPassword}
-          onRemove={handleRemovePassword}
         />
 
         {/* Display Settings */}
@@ -171,6 +159,6 @@ export default function SettingsPage() {
         dangerous
       />
     </div>
+    </AdminGate>
   );
 }
-

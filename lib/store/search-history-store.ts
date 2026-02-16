@@ -6,6 +6,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { profiledKey } from '@/lib/utils/profile-storage';
 
 const MAX_HISTORY_ITEMS = 20;
 
@@ -113,8 +114,8 @@ const createSearchHistoryStore = (name: string) =>
     )
   );
 
-export const useSearchHistoryStore = createSearchHistoryStore('kvideo-search-history');
-export const usePremiumSearchHistoryStore = createSearchHistoryStore('kvideo-premium-search-history');
+export const useSearchHistoryStore = createSearchHistoryStore(profiledKey('kvideo-search-history'));
+export const usePremiumSearchHistoryStore = createSearchHistoryStore(profiledKey('kvideo-premium-search-history'));
 
 /**
  * Helper hook to get the appropriate search history store

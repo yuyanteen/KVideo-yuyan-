@@ -168,6 +168,11 @@ export const VideoCard = memo<VideoCardProps>(({
                                             {video.vod_remarks}
                                         </p>
                                     )}
+                                    {video.vod_lang && (
+                                        <p className="text-xs text-[var(--text-color-secondary)] mt-1">
+                                            {video.vod_lang}
+                                        </p>
+                                    )}
                                 </>
                             );
                         })()}
