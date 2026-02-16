@@ -33,6 +33,9 @@ export function useHomePage() {
         resetSearch,
         loadCachedResults,
         applySorting,
+        loadMore,
+        hasMore,
+        loadingMore,
     } = useParallelSearch(
         saveToCache,
         onUrlUpdate
@@ -152,5 +155,8 @@ export function useHomePage() {
         totalSources,
         handleSearch,
         handleReset,
+        loadMore,
+        hasMore,
+        loadingMore,
     };
 }

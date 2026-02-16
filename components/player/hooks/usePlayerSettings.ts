@@ -93,7 +93,7 @@ export function usePlayerSettings() {
         updateSetting('adKeywords', value);
     }, [updateSetting]);
 
-    const setFullscreenType = useCallback((value: 'native' | 'window') => {
+    const setFullscreenType = useCallback((value: 'auto' | 'native' | 'window') => {
         updateSetting('fullscreenType', value);
     }, [updateSetting]);
 

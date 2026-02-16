@@ -20,7 +20,7 @@ export function SearchResults({
     availableSources,
     loading,
     isPremium = false,
-    latencies = {}
+    latencies = {},
 }: SearchResultsProps) {
     // Source badges hook - filters by video source
     const {
@@ -77,3 +77,5 @@ export function SearchResults({
         </div>
     );
 }
+
+

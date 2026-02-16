@@ -44,7 +44,7 @@ export interface AppSettings {
   realtimeLatency: boolean; // Enable real-time latency ping updates
   searchDisplayMode: SearchDisplayMode; // 'normal' = individual cards, 'grouped' = group same-name videos
   episodeReverseOrder: boolean; // Persist episode list reverse state
-  fullscreenType: 'native' | 'window'; // Fullscreen mode preference
+  fullscreenType: 'auto' | 'native' | 'window'; // Fullscreen mode preference: 'auto' (native on desktop, window on mobile) | 'native' | 'window'
   proxyMode: ProxyMode; // Proxy behavior: 'retry' | 'none' | 'always'
   rememberScrollPosition: boolean; // Remember scroll position when navigating back or refreshing
 }
@@ -118,7 +118,7 @@ function getDefaultAppSettings(): AppSettings {
     realtimeLatency: false,
     searchDisplayMode: 'normal',
     episodeReverseOrder: false,
-    fullscreenType: 'native',
+    fullscreenType: 'auto',
     proxyMode: 'retry',
     rememberScrollPosition: true,
   };
@@ -196,7 +196,7 @@ export const settingsStore = {
         realtimeLatency: parsed.realtimeLatency !== undefined ? parsed.realtimeLatency : false,
         searchDisplayMode: parsed.searchDisplayMode === 'grouped' ? 'grouped' : 'normal',
         episodeReverseOrder: parsed.episodeReverseOrder !== undefined ? parsed.episodeReverseOrder : false,
-        fullscreenType: parsed.fullscreenType === 'window' ? 'window' : 'native',
+        fullscreenType: (parsed.fullscreenType === 'window' || parsed.fullscreenType === 'native' || parsed.fullscreenType === 'auto') ? parsed.fullscreenType : 'auto',
         proxyMode: (parsed.proxyMode === 'retry' || parsed.proxyMode === 'none' || parsed.proxyMode === 'always') ? parsed.proxyMode : 'retry',
         rememberScrollPosition: parsed.rememberScrollPosition !== undefined ? parsed.rememberScrollPosition : true,
       };

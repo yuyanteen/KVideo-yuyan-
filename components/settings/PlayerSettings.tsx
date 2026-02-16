@@ -9,8 +9,8 @@ import { Icons } from '@/components/ui/Icon';
 import type { ProxyMode } from '@/lib/store/settings-store';
 
 interface PlayerSettingsProps {
-    fullscreenType: 'native' | 'window';
-    onFullscreenTypeChange: (type: 'native' | 'window') => void;
+    fullscreenType: 'auto' | 'native' | 'window';
+    onFullscreenTypeChange: (type: 'auto' | 'native' | 'window') => void;
     proxyMode: ProxyMode;
     onProxyModeChange: (mode: ProxyMode) => void;
 }

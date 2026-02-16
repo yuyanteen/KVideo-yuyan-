@@ -282,11 +282,15 @@ export function DesktopMoreMenu({
                 <div className="relative">
                     <button
                         onClick={() => {
-                            setFullscreenType(fullscreenType === 'native' ? 'window' : 'native');
+                            if (fullscreenType === 'auto') setFullscreenType('native');
+                            else if (fullscreenType === 'native') setFullscreenType('window');
+                            else setFullscreenType('auto');
                         }}
                         className={`flex items-center gap-1 bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] rounded-[var(--radius-2xl)] outline-none hover:border-[var(--accent-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_5%,transparent)] transition-all cursor-pointer whitespace-nowrap ${isRotated ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 sm:px-2.5 py-1 sm:py-1.5 text-[10px] sm:text-xs'}`}
                     >
-                        <span>{fullscreenType === 'native' ? '系统全屏' : '网页全屏'}</span>
+                        <span>
+                            {fullscreenType === 'auto' ? '自动 (Auto)' : fullscreenType === 'native' ? '系统全屏' : '网页全屏'}
+                        </span>
                         <Icons.Maximize size={isRotated ? 10 : 12} className="text-[var(--text-color-secondary)]" />
                     </button>
                 </div>

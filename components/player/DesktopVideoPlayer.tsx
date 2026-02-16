@@ -9,7 +9,7 @@ import { useStallDetection } from './hooks/useStallDetection';
 import { DesktopControlsWrapper } from './desktop/DesktopControlsWrapper';
 import { DesktopOverlayWrapper } from './desktop/DesktopOverlayWrapper';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
-import { useIsIOS } from '@/lib/hooks/mobile/useDeviceDetection';
+import { useIsIOS, useIsMobile } from '@/lib/hooks/mobile/useDeviceDetection';
 import './web-fullscreen.css';
 
 interface DesktopVideoPlayerProps {
@@ -41,6 +41,7 @@ export function DesktopVideoPlayer({
   const { refs, data, actions } = useDesktopPlayerState();
   const { fullscreenType: settingsFullscreenType } = usePlayerSettings();
   const isIOS = useIsIOS();
+  const isMobile = useIsMobile();
 
   // State to track if device is in landscape mode
   const [isLandscape, setIsLandscape] = React.useState(true);
@@ -62,8 +63,13 @@ export function DesktopVideoPlayer({
     };
   }, []);
 
-  // Force windowed fullscreen on iOS to avoid native player hijacking
-  const fullscreenType = isIOS ? 'window' : settingsFullscreenType;
+  // Use user preference for fullscreen type, resolving 'auto' to device default
+  // Auto Rules:
+  // - Mobile: Window Fullscreen (Better for Danmaku/Controls)
+  // - Desktop: Native Fullscreen (Better for PiP/Performance)
+  const fullscreenType = settingsFullscreenType === 'auto'
+    ? (isIOS ? 'window' : isMobile ? 'window' : 'native') // Treat all mobile as window for consistency if auto
+    : settingsFullscreenType;
 
   // Check if we need to force landscape (iOS + Fullscreen + Portrait)
   const shouldForceLandscape = data.isFullscreen && fullscreenType === 'window' && isIOS && !isLandscape;
