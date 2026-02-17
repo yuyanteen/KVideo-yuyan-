@@ -10,6 +10,7 @@ export interface M3UChannel {
   group?: string;
   tvgId?: string;
   tvgName?: string;
+  routes?: string[];
 }
 
 export interface M3UPlaylist {
@@ -75,4 +76,38 @@ export function parseM3U(content: string): M3UPlaylist {
     channels,
     groups: Array.from(groupSet).sort(),
   };
+}
+
+/**
+ * Group channels with the same name into single entries with multiple routes.
+ * This merges duplicate channel names (common in M3U playlists with multiple streams).
+ */
+export function groupChannelsByName(channels: M3UChannel[]): M3UChannel[] {
+  const groups = new Map<string, M3UChannel>();
+
+  for (const ch of channels) {
+    const key = ch.name.toLowerCase().trim();
+    const existing = groups.get(key);
+    if (existing) {
+      if (!existing.routes) {
+        existing.routes = [existing.url];
+      }
+      if (!existing.routes.includes(ch.url)) {
+        existing.routes.push(ch.url);
+      }
+      // Use first logo found
+      if (!existing.logo && ch.logo) existing.logo = ch.logo;
+    } else {
+      groups.set(key, { ...ch });
+    }
+  }
+
+  // Only add routes array when there are multiple routes
+  const result = Array.from(groups.values());
+  for (const ch of result) {
+    if (ch.routes && ch.routes.length <= 1) {
+      delete ch.routes;
+    }
+  }
+  return result;
 }

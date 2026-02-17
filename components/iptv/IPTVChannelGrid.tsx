@@ -149,13 +149,22 @@ export function IPTVChannelGrid({ channels, groups, onSelect, activeChannel }: I
                 }`}>
                   {channel.name}
                 </p>
-                {channel.group && (
-                  <p className={`text-[10px] truncate ${
-                    activeChannel?.url === channel.url ? 'text-white/70' : 'text-[var(--text-color-secondary)]'
-                  }`}>
-                    {channel.group}
-                  </p>
-                )}
+                <div className="flex items-center gap-1">
+                  {channel.group && (
+                    <p className={`text-[10px] truncate ${
+                      activeChannel?.url === channel.url ? 'text-white/70' : 'text-[var(--text-color-secondary)]'
+                    }`}>
+                      {channel.group}
+                    </p>
+                  )}
+                  {channel.routes && channel.routes.length > 1 && (
+                    <span className={`text-[9px] px-1 rounded flex-shrink-0 ${
+                      activeChannel?.url === channel.url ? 'bg-white/20 text-white/80' : 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
+                    }`}>
+                      {channel.routes.length}线路
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </button>

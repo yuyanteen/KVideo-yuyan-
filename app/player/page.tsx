@@ -179,6 +179,7 @@ function PlayerContent() {
 
   // Track current source for switching
   const [currentSourceId, setCurrentSourceId] = useState(source);
+  const playerTimeRef = useRef(0);
 
   // Add initial history entry when video data is loaded
   useEffect(() => {
@@ -277,6 +278,7 @@ function PlayerContent() {
                 isPremium={isPremium}
                 videoTitle={videoData?.vod_name || title || ''}
                 episodeName={videoData?.episodes?.[currentEpisode]?.name || ''}
+                externalTimeRef={playerTimeRef}
               />
               <div className="hidden lg:block">
                 <VideoMetadata
@@ -346,6 +348,10 @@ function PlayerContent() {
                       params.set('title', title || '');
                       // Preserve current episode index
                       params.set('episode', currentEpisode.toString());
+                      // Preserve playback position for seamless source switch
+                      if (playerTimeRef.current > 1) {
+                        params.set('t', Math.floor(playerTimeRef.current).toString());
+                      }
                       // Pass all known sources so switching persists
                       const allSources = groupedSources.length > 0 ? groupedSources : [];
                       if (allSources.length > 1) {

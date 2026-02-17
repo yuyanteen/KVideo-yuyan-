@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { parseM3U, type M3UChannel } from '@/lib/utils/m3u-parser';
+import { parseM3U, groupChannelsByName, type M3UChannel } from '@/lib/utils/m3u-parser';
 
 export interface IPTVSource {
   id: string;
@@ -32,7 +32,6 @@ interface IPTVActions {
 interface IPTVStore extends IPTVState, IPTVActions {}
 
 const MAX_CONCURRENT = 3;
-const MAX_CHANNELS = 5000; // Safety limit to prevent UI freeze
 
 async function fetchWithConcurrencyLimit<T>(
   tasks: (() => Promise<T>)[],
@@ -111,13 +110,11 @@ export const useIPTVStore = create<IPTVStore>()(
 
           await fetchWithConcurrencyLimit(tasks, MAX_CONCURRENT);
 
-          // Limit total channels for performance
-          const finalChannels = allChannels.length > MAX_CHANNELS
-            ? allChannels.slice(0, MAX_CHANNELS)
-            : allChannels;
+          // Group channels with the same name into multi-route entries
+          const grouped = groupChannelsByName(allChannels);
 
           set({
-            cachedChannels: finalChannels,
+            cachedChannels: grouped,
             cachedGroups: Array.from(allGroups).sort(),
             lastRefreshed: Date.now(),
             isLoading: false,

@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * IPTVPlayer - Lightweight player for IPTV live streams
- * Uses HLS.js for playback with a channel switching sidebar.
- * Routes streams through /api/iptv/stream proxy to avoid CORS issues.
+ * IPTVPlayer - Player for IPTV streams with controls, volume, progress, and sidebar.
+ * Supports HLS (via HLS.js), native HLS (Safari), and direct video playback.
+ * Routes streams through proxy to avoid CORS when direct access fails.
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react';
@@ -22,88 +22,215 @@ function getProxiedUrl(url: string): string {
   return `/api/iptv/stream?url=${encodeURIComponent(url)}`;
 }
 
+function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds < 0) return '0:00';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTVPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const activeChannelRef = useRef<HTMLButtonElement>(null);
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [isLive, setIsLive] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const loadChannel = useCallback((ch: M3UChannel) => {
+  // Get current route URL
+  const routes = channel.routes || [channel.url];
+  const currentUrl = routes[currentRouteIndex] || channel.url;
+
+  // Auto-scroll to active channel in sidebar
+  useEffect(() => {
+    if (showSidebar && activeChannelRef.current) {
+      activeChannelRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [showSidebar, channel.url]);
+
+  // Track fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Controls auto-hide
+  const resetControlsTimeout = useCallback(() => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
+  }, []);
+
+  // Video event handlers
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+      const dur = video.duration;
+      if (isFinite(dur) && dur > 0) {
+        setDuration(dur);
+        setIsLive(false);
+      } else {
+        setIsLive(true);
+      }
+    };
+    const onDurationChange = () => {
+      const dur = video.duration;
+      if (isFinite(dur) && dur > 0) {
+        setDuration(dur);
+        setIsLive(false);
+      }
+    };
+    const onVolumeChange = () => {
+      setVolume(video.volume);
+      setIsMuted(video.muted);
+    };
+
+    video.addEventListener('play', onPlay);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('timeupdate', onTimeUpdate);
+    video.addEventListener('durationchange', onDurationChange);
+    video.addEventListener('volumechange', onVolumeChange);
+
+    return () => {
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('timeupdate', onTimeUpdate);
+      video.removeEventListener('durationchange', onDurationChange);
+      video.removeEventListener('volumechange', onVolumeChange);
+    };
+  }, []);
+
+  const loadChannel = useCallback((url: string) => {
     const video = videoRef.current;
     if (!video) return;
 
     setError(null);
     setIsLoading(true);
+    setIsLive(true);
+    setCurrentTime(0);
+    setDuration(0);
 
-    // Clean up previous HLS instance
+    // Clean up previous
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    video.removeAttribute('src');
+    video.load();
 
-    const originalUrl = ch.url;
-    const proxiedUrl = getProxiedUrl(originalUrl);
+    const proxiedUrl = getProxiedUrl(url);
 
-    // Try HLS.js first for all URLs (many IPTV streams are HLS even without .m3u8 extension)
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
-        liveDurationInfinity: true,
       });
       hlsRef.current = hls;
 
       let triedProxy = false;
+      let triedDirect = false;
+
+      const tryDirectVideo = (directUrl: string) => {
+        if (triedDirect) {
+          setIsLoading(false);
+          setError('播放错误，请尝试其他线路或频道');
+          return;
+        }
+        triedDirect = true;
+        const vid = videoRef.current;
+        if (!vid) return;
+        vid.src = directUrl;
+        vid.addEventListener('loadedmetadata', () => {
+          setIsLoading(false);
+          vid.play().catch(() => {});
+        }, { once: true });
+        vid.addEventListener('error', () => {
+          if (directUrl === url) {
+            // Try proxied direct video
+            const vid2 = videoRef.current;
+            if (!vid2) return;
+            vid2.src = proxiedUrl;
+            vid2.addEventListener('loadedmetadata', () => {
+              setIsLoading(false);
+              vid2.play().catch(() => {});
+            }, { once: true });
+            vid2.addEventListener('error', () => {
+              setIsLoading(false);
+              setError('播放错误，请尝试其他线路或频道');
+            }, { once: true });
+          } else {
+            setIsLoading(false);
+            setError('播放错误，请尝试其他线路或频道');
+          }
+        }, { once: true });
+      };
 
       const tryWithProxy = () => {
-        if (triedProxy) return;
+        if (triedProxy) {
+          tryDirectVideo(url);
+          return;
+        }
         triedProxy = true;
-        // Retry with proxied URL
         hls.destroy();
         const hlsProxy = new Hls({
           enableWorker: true,
           lowLatencyMode: true,
-          liveDurationInfinity: true,
         });
         hlsRef.current = hlsProxy;
-
         hlsProxy.loadSource(proxiedUrl);
         hlsProxy.attachMedia(video);
-
         hlsProxy.on(Hls.Events.MANIFEST_PARSED, () => {
           setIsLoading(false);
           video.play().catch(() => {});
         });
-
         hlsProxy.on(Hls.Events.ERROR, (_, data) => {
           if (data.fatal) {
-            setIsLoading(false);
             if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
               hlsProxy.recoverMediaError();
             } else {
-              // Last resort: try direct video element
               hlsProxy.destroy();
               hlsRef.current = null;
-              tryDirectVideo(proxiedUrl);
+              tryDirectVideo(url);
             }
           }
         });
       };
 
-      // First try direct URL
-      hls.loadSource(originalUrl);
+      // First try direct URL with HLS.js
+      hls.loadSource(url);
       hls.attachMedia(video);
-
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
         video.play().catch(() => {});
       });
-
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            // Likely CORS - try proxy
             tryWithProxy();
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError();
@@ -113,64 +240,114 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
         }
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native HLS (Safari/iOS) - try direct first, fall back to proxy
-      tryNativeHls(video, originalUrl, proxiedUrl);
-    } else {
-      tryDirectVideo(originalUrl);
-    }
-
-    function tryNativeHls(vid: HTMLVideoElement, url: string, fallbackUrl: string) {
-      vid.src = url;
-      const onLoad = () => {
+      // Native HLS (Safari/iOS)
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => {
         setIsLoading(false);
-        vid.play().catch(() => {});
-      };
-      const onError = () => {
-        vid.removeEventListener('loadedmetadata', onLoad);
-        // Try proxied URL
-        vid.src = fallbackUrl;
-        vid.addEventListener('loadedmetadata', () => {
+        video.play().catch(() => {});
+      }, { once: true });
+      video.addEventListener('error', () => {
+        video.src = proxiedUrl;
+        video.addEventListener('loadedmetadata', () => {
           setIsLoading(false);
-          vid.play().catch(() => {});
+          video.play().catch(() => {});
         }, { once: true });
-        vid.addEventListener('error', () => {
+        video.addEventListener('error', () => {
           setIsLoading(false);
           setError('播放错误');
         }, { once: true });
-      };
-      vid.addEventListener('loadedmetadata', onLoad, { once: true });
-      vid.addEventListener('error', onError, { once: true });
-    }
-
-    function tryDirectVideo(url: string) {
-      const vid = videoRef.current;
-      if (!vid) return;
-      vid.src = url;
-      vid.addEventListener('loadedmetadata', () => {
-        setIsLoading(false);
-        vid.play().catch(() => {});
       }, { once: true });
-      vid.addEventListener('error', () => {
+    } else {
+      // Direct video fallback
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => {
         setIsLoading(false);
-        setError('播放错误，请尝试其他频道');
+        video.play().catch(() => {});
+      }, { once: true });
+      video.addEventListener('error', () => {
+        video.src = proxiedUrl;
+        video.addEventListener('loadedmetadata', () => {
+          setIsLoading(false);
+          video.play().catch(() => {});
+        }, { once: true });
+        video.addEventListener('error', () => {
+          setIsLoading(false);
+          setError('播放错误，请尝试其他频道');
+        }, { once: true });
       }, { once: true });
     }
   }, []);
 
+  // Load on channel/route change
   useEffect(() => {
-    loadChannel(channel);
+    loadChannel(currentUrl);
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [channel, loadChannel]);
+  }, [currentUrl, loadChannel]);
+
+  // Reset route index when channel changes
+  useEffect(() => {
+    setCurrentRouteIndex(0);
+  }, [channel.name, channel.url]);
+
+  // Playback controls
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) video.play().catch(() => {});
+    else video.pause();
+  };
+
+  const toggleMute = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+  };
+
+  const handleVolumeChange = (value: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.volume = value;
+    if (value > 0 && video.muted) video.muted = false;
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isLive) return;
+    const video = videoRef.current;
+    if (!video || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    video.currentTime = ratio * duration;
+  };
+
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return;
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await containerRef.current.requestFullscreen();
+    }
+  };
+
+  const VolumeIcon = isMuted || volume === 0 ? Icons.VolumeX : volume < 0.5 ? Icons.Volume1 : Icons.Volume2;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black flex">
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-[9999] bg-black flex"
+      onMouseMove={resetControlsTimeout}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest('[data-controls]') || (e.target as HTMLElement).closest('[data-sidebar]')) return;
+        togglePlay();
+        resetControlsTimeout();
+      }}
+    >
       {/* Player Area */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative overflow-hidden">
         <video
           ref={videoRef}
           className="w-full h-full object-contain bg-black"
@@ -178,9 +355,9 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
           autoPlay
         />
 
-        {/* Loading Overlay */}
+        {/* Loading */}
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 pointer-events-none">
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               <p className="text-white/70 text-sm">加载中...</p>
@@ -188,88 +365,214 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
           </div>
         )}
 
-        {/* Error Overlay */}
+        {/* Error */}
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-            <div className="text-center">
-              <p className="text-red-400 text-sm mb-2">{error}</p>
-              <button
-                onClick={() => loadChannel(channel)}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm transition-colors cursor-pointer"
-              >
-                重试
-              </button>
+            <div className="text-center" data-controls>
+              <p className="text-red-400 text-sm mb-3">{error}</p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={(e) => { e.stopPropagation(); loadChannel(currentUrl); }}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm transition-colors cursor-pointer"
+                >
+                  重试
+                </button>
+                {routes.length > 1 && currentRouteIndex < routes.length - 1 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setCurrentRouteIndex(prev => prev + 1); }}
+                    className="px-4 py-2 bg-blue-600/80 hover:bg-blue-600 rounded-lg text-white text-sm transition-colors cursor-pointer"
+                  >
+                    切换线路
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* LIVE Badge */}
-        <div className="absolute top-4 left-4 flex items-center gap-2">
-          <span className="px-2 py-0.5 bg-red-600 text-white text-xs font-bold rounded flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-            LIVE
-          </span>
-          <span className="text-white text-sm font-medium drop-shadow-lg">{channel.name}</span>
+        {/* Top Bar */}
+        <div
+          data-controls
+          className={`absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {isLive && (
+                <span className="px-2 py-0.5 bg-red-600 text-white text-xs font-bold rounded flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  LIVE
+                </span>
+              )}
+              <span className="text-white text-sm font-medium drop-shadow-lg">{channel.name}</span>
+              {routes.length > 1 && (
+                <span className="text-white/50 text-xs">线路 {currentRouteIndex + 1}/{routes.length}</span>
+              )}
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); onClose(); }}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors cursor-pointer"
+            >
+              <Icons.X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* Controls */}
-        <div className="absolute top-4 right-4 flex gap-2">
-          <button
-            onClick={() => setShowSidebar(!showSidebar)}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors cursor-pointer"
-          >
-            <Icons.List size={20} />
-          </button>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors cursor-pointer"
-          >
-            <Icons.X size={20} />
-          </button>
+        {/* Bottom Controls */}
+        <div
+          data-controls
+          className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        >
+          {/* Progress Bar (non-live only) */}
+          {!isLive && duration > 0 && (
+            <div className="px-4 pt-2">
+              <div
+                className="group h-1 hover:h-2 bg-white/20 rounded-full cursor-pointer transition-all relative"
+                onClick={(e) => { e.stopPropagation(); handleSeek(e); }}
+              >
+                <div
+                  className="h-full bg-[var(--accent-color)] rounded-full relative"
+                  style={{ width: `${(currentTime / duration) * 100}%` }}
+                >
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 px-4 py-3">
+            {/* Play/Pause */}
+            <button
+              onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors cursor-pointer"
+            >
+              {isPlaying ? <Icons.Pause size={20} /> : <Icons.Play size={20} />}
+            </button>
+
+            {/* Time Display */}
+            {!isLive && duration > 0 && (
+              <span className="text-white/70 text-xs tabular-nums">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+            )}
+
+            <div className="flex-1" />
+
+            {/* Route Selector */}
+            {routes.length > 1 && (
+              <div className="flex gap-1" data-controls>
+                {routes.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={(e) => { e.stopPropagation(); setCurrentRouteIndex(i); }}
+                    className={`px-2 py-0.5 text-[10px] rounded transition-colors cursor-pointer ${
+                      i === currentRouteIndex
+                        ? 'bg-[var(--accent-color)] text-white'
+                        : 'bg-white/10 text-white/60 hover:bg-white/20'
+                    }`}
+                  >
+                    线路{i + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Volume */}
+            <div
+              className="relative flex items-center"
+              onMouseEnter={() => setShowVolumeSlider(true)}
+              onMouseLeave={() => setShowVolumeSlider(false)}
+            >
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors cursor-pointer"
+              >
+                <VolumeIcon size={18} />
+              </button>
+              {showVolumeSlider && (
+                <div className="ml-1 w-20 flex items-center" data-controls>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={isMuted ? 0 : volume}
+                    onChange={(e) => { e.stopPropagation(); handleVolumeChange(parseFloat(e.target.value)); }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full h-1 accent-white cursor-pointer"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Channel List */}
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowSidebar(!showSidebar); }}
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors cursor-pointer"
+            >
+              <Icons.List size={18} />
+            </button>
+
+            {/* Fullscreen */}
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors cursor-pointer"
+            >
+              {isFullscreen ? <Icons.Minimize size={18} /> : <Icons.Maximize size={18} />}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Channel Sidebar */}
+      {/* Sidebar */}
       {showSidebar && (
-        <div className="w-72 bg-[#111] border-l border-white/10 overflow-y-auto">
-          <div className="p-3 border-b border-white/10 flex items-center justify-between">
+        <div data-sidebar className="w-72 bg-[#111] border-l border-white/10 overflow-y-auto flex-shrink-0">
+          <div className="p-3 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#111] z-10">
             <h3 className="text-white text-sm font-medium">频道列表</h3>
             <button
-              onClick={() => setShowSidebar(false)}
+              onClick={(e) => { e.stopPropagation(); setShowSidebar(false); }}
               className="text-white/50 hover:text-white cursor-pointer"
             >
               <Icons.X size={16} />
             </button>
           </div>
           <div className="p-1">
-            {channels.map((ch, i) => (
-              <button
-                key={`${ch.name}-${i}`}
-                onClick={() => {
-                  onChannelChange(ch);
-                  setShowSidebar(false);
-                }}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                  ch.url === channel.url
-                    ? 'bg-[var(--accent-color)] text-white'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {ch.url === channel.url && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />
+            {channels.map((ch, i) => {
+              const isActive = ch.name === channel.name && ch.url === channel.url;
+              return (
+                <button
+                  key={`${ch.name}-${i}`}
+                  ref={isActive ? activeChannelRef : undefined}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChannelChange(ch);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+                    isActive
+                      ? 'bg-[var(--accent-color)] text-white'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {isActive && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0 animate-pulse" />
+                    )}
+                    <span className="truncate flex-1">{ch.name}</span>
+                    {ch.routes && ch.routes.length > 1 && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
+                        isActive ? 'bg-white/20' : 'bg-white/5 text-white/40'
+                      }`}>
+                        {ch.routes.length}线路
+                      </span>
+                    )}
+                  </div>
+                  {ch.group && (
+                    <span className={`text-[10px] ${isActive ? 'text-white/60' : 'text-white/30'}`}>
+                      {ch.group}
+                    </span>
                   )}
-                  <span className="truncate">{ch.name}</span>
-                </div>
-                {ch.group && (
-                  <span className={`text-[10px] ${
-                    ch.url === channel.url ? 'text-white/60' : 'text-white/30'
-                  }`}>
-                    {ch.group}
-                  </span>
-                )}
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
