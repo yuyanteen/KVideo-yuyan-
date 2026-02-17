@@ -8,7 +8,9 @@ import { useAutoSkip } from './hooks/useAutoSkip';
 import { useStallDetection } from './hooks/useStallDetection';
 import { DesktopControlsWrapper } from './desktop/DesktopControlsWrapper';
 import { DesktopOverlayWrapper } from './desktop/DesktopOverlayWrapper';
+import { DanmakuCanvas } from './DanmakuCanvas';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
+import { useDanmaku } from './hooks/useDanmaku';
 import { useIsIOS, useIsMobile } from '@/lib/hooks/mobile/useDeviceDetection';
 import { useDoubleTap } from '@/lib/hooks/mobile/useDoubleTap';
 import './web-fullscreen.css';
@@ -25,6 +27,9 @@ interface DesktopVideoPlayerProps {
   currentEpisodeIndex?: number;
   onNextEpisode?: () => void;
   isReversed?: boolean;
+  // Danmaku props
+  videoTitle?: string;
+  episodeName?: string;
 }
 
 export function DesktopVideoPlayer({
@@ -38,11 +43,20 @@ export function DesktopVideoPlayer({
   currentEpisodeIndex = 0,
   onNextEpisode,
   isReversed = false,
+  videoTitle = '',
+  episodeName = '',
 }: DesktopVideoPlayerProps) {
   const { refs, data, actions } = useDesktopPlayerState();
   const { fullscreenType: settingsFullscreenType } = usePlayerSettings();
   const isIOS = useIsIOS();
   const isMobile = useIsMobile();
+
+  // Danmaku
+  const { danmakuEnabled, setDanmakuEnabled, comments: danmakuComments } = useDanmaku({
+    videoTitle,
+    episodeName,
+    episodeIndex: currentEpisodeIndex,
+  });
 
   // State to track if device is in landscape mode
   const [isLandscape, setIsLandscape] = React.useState(true);
@@ -206,6 +220,16 @@ export function DesktopVideoPlayer({
             onTouchStart={isMobile ? handleTap : undefined}
             {...({ 'webkit-playsinline': 'true' } as any)} // Legacy iOS support
           />
+
+          {/* Danmaku Canvas */}
+          {danmakuEnabled && danmakuComments.length > 0 && (
+            <DanmakuCanvas
+              comments={danmakuComments}
+              currentTime={currentTime}
+              isPlaying={isPlaying}
+              duration={duration}
+            />
+          )}
 
           <DesktopOverlayWrapper
             data={data}

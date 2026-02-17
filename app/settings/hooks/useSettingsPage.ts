@@ -26,6 +26,11 @@ export function useSettingsPage() {
     const [proxyMode, setProxyMode] = useState<ProxyMode>('retry');
     const [rememberScrollPosition, setRememberScrollPosition] = useState(true);
 
+    // Danmaku settings
+    const [danmakuApiUrl, setDanmakuApiUrl] = useState('');
+    const [danmakuOpacity, setDanmakuOpacity] = useState(0.7);
+    const [danmakuFontSize, setDanmakuFontSize] = useState(20);
+
     useEffect(() => {
         const settings = settingsStore.getSettings();
         setSources(settings.sources || []);
@@ -36,6 +41,9 @@ export function useSettingsPage() {
         setFullscreenType(settings.fullscreenType);
         setProxyMode(settings.proxyMode);
         setRememberScrollPosition(settings.rememberScrollPosition);
+        setDanmakuApiUrl(settings.danmakuApiUrl);
+        setDanmakuOpacity(settings.danmakuOpacity);
+        setDanmakuFontSize(settings.danmakuFontSize);
     }, []);
 
     const handleSourcesChange = (newSources: VideoSource[]) => {
@@ -246,6 +254,34 @@ export function useSettingsPage() {
         });
     };
 
+    const handleDanmakuApiUrlChange = (url: string) => {
+        setDanmakuApiUrl(url);
+        const currentSettings = settingsStore.getSettings();
+        settingsStore.saveSettings({
+            ...currentSettings,
+            danmakuApiUrl: url,
+        });
+    };
+
+    const handleDanmakuOpacityChange = (value: number) => {
+        const clamped = Math.max(0.1, Math.min(1, value));
+        setDanmakuOpacity(clamped);
+        const currentSettings = settingsStore.getSettings();
+        settingsStore.saveSettings({
+            ...currentSettings,
+            danmakuOpacity: clamped,
+        });
+    };
+
+    const handleDanmakuFontSizeChange = (value: number) => {
+        setDanmakuFontSize(value);
+        const currentSettings = settingsStore.getSettings();
+        settingsStore.saveSettings({
+            ...currentSettings,
+            danmakuFontSize: value,
+        });
+    };
+
     const handleRestoreDefaults = () => {
         const defaults = getDefaultSources();
         handleSourcesChange(defaults);
@@ -296,5 +332,11 @@ export function useSettingsPage() {
         handleProxyModeChange,
         rememberScrollPosition,
         handleRememberScrollPositionChange,
+        danmakuApiUrl,
+        handleDanmakuApiUrlChange,
+        danmakuOpacity,
+        handleDanmakuOpacityChange,
+        danmakuFontSize,
+        handleDanmakuFontSizeChange,
     };
 }

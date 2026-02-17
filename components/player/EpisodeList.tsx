@@ -1,15 +1,25 @@
 'use client';
 
-import { useRef, useCallback, useState, useMemo } from 'react';
+import { useRef, useCallback, useState, useMemo, useEffect } from 'react';
+import Image from 'next/image';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icons } from '@/components/ui/Icon';
+import { LatencyBadge } from '@/components/ui/LatencyBadge';
+import { Button } from '@/components/ui/Button';
 import { useKeyboardNavigation } from '@/lib/hooks/useKeyboardNavigation';
-import { settingsStore } from '@/lib/store/settings-store';
 
 interface Episode {
   name?: string;
   url: string;
+}
+
+export interface SourceInfo {
+  id: string | number;
+  source: string;
+  sourceName?: string;
+  latency?: number;
+  pic?: string;
 }
 
 interface EpisodeListProps {
@@ -18,6 +28,10 @@ interface EpisodeListProps {
   isReversed?: boolean;
   onEpisodeClick: (episode: Episode, index: number) => void;
   onToggleReverse?: (reversed: boolean) => void;
+  // Optional source integration props
+  sources?: SourceInfo[];
+  currentSource?: string;
+  onSourceChange?: (source: SourceInfo) => void;
 }
 
 export function EpisodeList({
@@ -25,10 +39,82 @@ export function EpisodeList({
   currentEpisode,
   isReversed = false,
   onEpisodeClick,
-  onToggleReverse
+  onToggleReverse,
+  sources,
+  currentSource,
+  onSourceChange,
 }: EpisodeListProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [sourceExpanded, setSourceExpanded] = useState(false);
+
+  // Source latency state
+  const [latencies, setLatencies] = useState<Record<string, number>>({});
+  const [isLoadingLatency, setIsLoadingLatency] = useState(false);
+
+  const showSourceSelector = sources && sources.length > 1 && onSourceChange;
+
+  // Current source info
+  const currentSourceInfo = useMemo(() => {
+    if (!sources || !currentSource) return null;
+    return sources.find(s => s.source === currentSource) || null;
+  }, [sources, currentSource]);
+
+  // Sort sources by latency
+  const sortedSources = useMemo(() => {
+    if (!sources) return [];
+    return [...sources].sort((a, b) => {
+      const latA = latencies[a.source] ?? a.latency ?? Infinity;
+      const latB = latencies[b.source] ?? b.latency ?? Infinity;
+      return latA - latB;
+    });
+  }, [sources, latencies]);
+
+  // Initialize latencies from sources
+  useEffect(() => {
+    if (!sources) return;
+    const initial: Record<string, number> = {};
+    sources.forEach(s => {
+      if (s.latency !== undefined) {
+        initial[s.source] = s.latency;
+      }
+    });
+    setLatencies(initial);
+  }, [sources]);
+
+  // Refresh latencies
+  const refreshLatencies = useCallback(async () => {
+    if (!sources) return;
+    setIsLoadingLatency(true);
+
+    const results = await Promise.all(
+      sources.map(async (source) => {
+        try {
+          const response = await fetch('/api/ping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: source.source }),
+          });
+          if (response.ok) {
+            const data = await response.json();
+            return { source: source.source, latency: data.latency };
+          }
+        } catch {
+          // Ignore errors
+        }
+        return { source: source.source, latency: undefined };
+      })
+    );
+
+    const newLatencies: Record<string, number> = {};
+    results.forEach(({ source, latency }) => {
+      if (latency !== undefined) {
+        newLatencies[source] = latency;
+      }
+    });
+    setLatencies(newLatencies);
+    setIsLoadingLatency(false);
+  }, [sources]);
 
   // Memoized display episodes - reversed if toggle is on
   const displayEpisodes = useMemo(() => {
@@ -76,6 +162,117 @@ export function EpisodeList({
 
   return (
     <Card hover={false}>
+      {/* Integrated Source Selector Header */}
+      {showSourceSelector && (
+        <div className="mb-4">
+          <button
+            onClick={() => setSourceExpanded(!sourceExpanded)}
+            className="w-full flex items-center justify-between p-3 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:bg-[var(--glass-hover)] transition-all duration-200"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Icons.Layers size={16} className="flex-shrink-0 text-[var(--text-color-secondary)]" />
+              <span className="text-sm font-medium text-[var(--text-color)] truncate">
+                {currentSourceInfo?.sourceName || currentSourceInfo?.source || '当前来源'}
+              </span>
+              <Badge variant="primary" className="flex-shrink-0">{sources!.length}</Badge>
+            </div>
+            <Icons.ChevronDown
+              size={16}
+              className={`flex-shrink-0 text-[var(--text-color-secondary)] transition-transform duration-200 ${sourceExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {/* Expanded source list */}
+          {sourceExpanded && (
+            <div className="mt-2 space-y-2">
+              <div className="flex justify-end">
+                <Button
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    refreshLatencies();
+                  }}
+                  disabled={isLoadingLatency}
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1"
+                >
+                  <Icons.RefreshCw size={12} className={isLoadingLatency ? 'animate-spin' : ''} />
+                  刷新延迟
+                </Button>
+              </div>
+              <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                {sortedSources.map((source, index) => {
+                  const isCurrent = source.source === currentSource;
+                  const latency = latencies[source.source] ?? source.latency;
+
+                  return (
+                    <button
+                      key={`${source.source}-${index}`}
+                      onClick={() => {
+                        if (!isCurrent) {
+                          onSourceChange!(source);
+                          setSourceExpanded(false);
+                        }
+                      }}
+                      className={`
+                        w-full p-2.5 rounded-[var(--radius-2xl)] text-left transition-all duration-200
+                        flex items-center gap-2.5
+                        ${isCurrent
+                          ? 'bg-[var(--accent-color)] text-white shadow-[0_4px_12px_color-mix(in_srgb,var(--accent-color)_50%,transparent)]'
+                          : 'bg-[var(--glass-bg)] hover:bg-[var(--glass-hover)] text-[var(--text-color)] border border-[var(--glass-border)] cursor-pointer'
+                        }
+                      `}
+                      aria-current={isCurrent ? 'true' : undefined}
+                    >
+                      {source.pic && (
+                        <div className="w-10 h-14 rounded-[var(--radius-2xl)] overflow-hidden flex-shrink-0 bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)]">
+                          <Image
+                            src={source.pic}
+                            alt=""
+                            width={40}
+                            height={56}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">
+                          {source.sourceName || source.source}
+                        </div>
+                        {latency !== undefined && (
+                          <div className="mt-0.5">
+                            <LatencyBadge latency={latency} />
+                          </div>
+                        )}
+                      </div>
+                      {isCurrent && (
+                        <Icons.Play size={14} className="flex-shrink-0" />
+                      )}
+                      {!isCurrent && index < 3 && (
+                        <Badge
+                          variant="secondary"
+                          className={`flex-shrink-0 ${index === 0 ? 'bg-yellow-500/20 text-yellow-600 border-yellow-500' :
+                            index === 1 ? 'bg-gray-400/20 text-gray-600 border-gray-400' :
+                              'bg-orange-400/20 text-orange-600 border-orange-400'
+                          }`}
+                        >
+                          #{index + 1}
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Episode List Header */}
       <h3 className="text-lg sm:text-xl font-bold text-[var(--text-color)] mb-4 flex items-center gap-2">
         <Icons.List size={20} className="sm:w-6 sm:h-6" />
         <span>选集</span>

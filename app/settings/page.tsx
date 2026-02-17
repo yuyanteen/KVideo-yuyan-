@@ -53,6 +53,12 @@ export default function SettingsPage() {
     handleProxyModeChange,
     rememberScrollPosition,
     handleRememberScrollPositionChange,
+    danmakuApiUrl,
+    handleDanmakuApiUrlChange,
+    danmakuOpacity,
+    handleDanmakuOpacityChange,
+    danmakuFontSize,
+    handleDanmakuFontSizeChange,
   } = useSettingsPage();
 
   return (
@@ -71,6 +77,12 @@ export default function SettingsPage() {
           onFullscreenTypeChange={handleFullscreenTypeChange}
           proxyMode={proxyMode}
           onProxyModeChange={handleProxyModeChange}
+          danmakuApiUrl={danmakuApiUrl}
+          onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
+          danmakuOpacity={danmakuOpacity}
+          onDanmakuOpacityChange={handleDanmakuOpacityChange}
+          danmakuFontSize={danmakuFontSize}
+          onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
         />
 
         {/* Display Settings */}

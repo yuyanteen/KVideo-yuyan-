@@ -48,6 +48,7 @@ export const VideoCard = memo<VideoCardProps>(({
                 role="listitem"
                 aria-label={`${video.vod_name}${video.vod_remarks ? ` - ${video.vod_remarks}` : ''}`}
                 prefetch={false}
+                data-focusable
                 className="group cursor-pointer hover:translate-y-[-2px] transition-transform duration-200 ease-out block h-full"
             >
                 <Card
@@ -81,9 +82,10 @@ export const VideoCard = memo<VideoCardProps>(({
                             </div>
                         )}
 
-                        {/* Fallback Icon */}
-                        <div className="absolute inset-0 flex items-center justify-center -z-10">
-                            <Icons.Film size={64} className="text-[var(--text-color-secondary)] opacity-20" />
+                        {/* Fallback Icon - visible when image fails */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center -z-10 gap-2">
+                            <Icons.Film size={48} className="text-[var(--text-color-secondary)] opacity-40" />
+                            <span className="text-xs text-[var(--text-color-secondary)] opacity-60 px-2 text-center line-clamp-2">{video.vod_name}</span>
                         </div>
 
                         {/* Badge Container */}

@@ -47,6 +47,9 @@ export function DesktopMoreMenu({
         setAdFilterMode,
         fullscreenType,
         setFullscreenType,
+        danmakuEnabled,
+        setDanmakuEnabled,
+        danmakuApiUrl,
     } = usePlayerSettings();
 
     const buttonRef = React.useRef<HTMLButtonElement>(null);
@@ -356,6 +359,37 @@ export function DesktopMoreMenu({
                         </>
                     )}
                 </div>
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-[var(--glass-border)] my-1.5 sm:my-2" />
+
+            {/* Danmaku Toggle */}
+            <div className={`${isRotated ? 'px-2 py-1.5' : 'px-3 py-2 sm:px-4 sm:py-2.5'} flex items-center justify-between gap-4`}>
+                <div className={`flex items-center gap-2 ${!danmakuApiUrl ? 'text-[var(--text-color-secondary)]' : 'text-[var(--text-color)]'} ${isRotated ? 'text-[11px]' : 'text-xs sm:text-sm'}`}>
+                    <Icons.Danmaku size={isRotated ? 14 : 16} className="sm:w-[18px] sm:h-[18px]" />
+                    <span>弹幕</span>
+                    {!danmakuApiUrl && (
+                        <span className={`${isRotated ? 'text-[9px]' : 'text-[10px] sm:text-xs'} text-[var(--text-color-secondary)]`}>(未配置)</span>
+                    )}
+                </div>
+                <button
+                    onClick={() => danmakuApiUrl && setDanmakuEnabled(!danmakuEnabled)}
+                    disabled={!danmakuApiUrl}
+                    className={`relative rounded-full transition-all duration-300 flex-shrink-0 border border-white/20 ${!danmakuApiUrl
+                        ? 'bg-white/5 opacity-40 cursor-not-allowed'
+                        : danmakuEnabled
+                            ? 'bg-[var(--accent-color)] shadow-[0_0_15px_rgba(var(--accent-color-rgb),0.6)] cursor-pointer'
+                            : 'bg-white/5 hover:bg-white/10 cursor-pointer'
+                        } ${isRotated ? 'w-6 h-3.5' : 'w-8 h-[18px] sm:w-10 sm:h-6'}`}
+                    aria-checked={danmakuEnabled}
+                    role="switch"
+                >
+                    <span
+                        className={`absolute top-0.5 left-0.5 bg-white rounded-full transition-transform duration-300 shadow-[0_2px_4px_rgba(0,0,0,0.4)] ${isRotated ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5 sm:w-4.5 sm:h-4.5'} ${danmakuEnabled && danmakuApiUrl ? (isRotated ? 'translate-x-2.5' : 'translate-x-3.5 sm:translate-x-4.5') : 'translate-x-0'
+                            }`}
+                    />
+                </button>
             </div>
 
             {/* Auto Next Episode Switch */}

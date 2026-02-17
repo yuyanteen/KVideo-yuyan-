@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { useHistory } from '@/lib/store/history-store';
 import { settingsStore } from '@/lib/store/settings-store';
+import { premiumModeSettingsStore } from '@/lib/store/premium-mode-settings';
 import { CustomVideoPlayer } from './CustomVideoPlayer';
 import { VideoPlayerError } from './VideoPlayerError';
 import { VideoPlayerEmpty } from './VideoPlayerEmpty';
@@ -19,6 +20,9 @@ interface VideoPlayerProps {
   onNextEpisode?: () => void;
   isReversed?: boolean;
   isPremium?: boolean;
+  // Danmaku props
+  videoTitle?: string;
+  episodeName?: string;
 }
 
 export function VideoPlayer({
@@ -29,7 +33,9 @@ export function VideoPlayer({
   totalEpisodes,
   onNextEpisode,
   isReversed = false,
-  isPremium = false
+  isPremium = false,
+  videoTitle,
+  episodeName,
 }: VideoPlayerProps) {
   const [videoError, setVideoError] = useState<string>('');
   const [useProxy, setUseProxy] = useState(false);
@@ -47,14 +53,15 @@ export function VideoPlayer({
   const [proxyMode, setProxyMode] = useState<'retry' | 'none' | 'always'>('retry');
 
   useEffect(() => {
-    // Initial value
-    const settings = settingsStore.getSettings();
+    // Initial value - use mode-specific store
+    const store = isPremium ? premiumModeSettingsStore : settingsStore;
+    const settings = store.getSettings();
     setShowModeIndicator(settings.showModeIndicator);
     setProxyMode(settings.proxyMode);
 
     // Subscribe to changes
-    const unsubscribe = settingsStore.subscribe(() => {
-      const newSettings = settingsStore.getSettings();
+    const unsubscribe = store.subscribe(() => {
+      const newSettings = store.getSettings();
       setShowModeIndicator(newSettings.showModeIndicator);
       setProxyMode(newSettings.proxyMode);
     });
@@ -195,6 +202,7 @@ export function VideoPlayer({
   }
 
   return (
+    <div data-no-spatial>
     <Card hover={false} className="p-0 relative">
       {/* Mode Indicator Badge - controlled by settings */}
       {showModeIndicator && (
@@ -227,8 +235,11 @@ export function VideoPlayer({
           currentEpisodeIndex={currentEpisode}
           onNextEpisode={onNextEpisode}
           isReversed={isReversed}
+          videoTitle={videoTitle}
+          episodeName={episodeName}
         />
       )}
     </Card>
+    </div>
   );
 }
