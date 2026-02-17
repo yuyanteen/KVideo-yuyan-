@@ -26,6 +26,7 @@ export function usePlayerSettings() {
             danmakuApiUrl: stored.danmakuApiUrl,
             danmakuOpacity: stored.danmakuOpacity,
             danmakuFontSize: stored.danmakuFontSize,
+            danmakuDisplayArea: stored.danmakuDisplayArea,
         };
     });
 
@@ -49,6 +50,7 @@ export function usePlayerSettings() {
                 danmakuApiUrl: stored.danmakuApiUrl,
                 danmakuOpacity: stored.danmakuOpacity,
                 danmakuFontSize: stored.danmakuFontSize,
+                danmakuDisplayArea: stored.danmakuDisplayArea,
             });
         });
         return unsubscribe;
@@ -125,6 +127,10 @@ export function usePlayerSettings() {
         updateSetting('danmakuFontSize', value);
     }, [updateSetting]);
 
+    const setDanmakuDisplayArea = useCallback((value: number) => {
+        updateSetting('danmakuDisplayArea', value);
+    }, [updateSetting]);
+
     return {
         ...settings,
         setAutoNextEpisode,
@@ -142,5 +148,6 @@ export function usePlayerSettings() {
         setDanmakuApiUrl,
         setDanmakuOpacity,
         setDanmakuFontSize,
+        setDanmakuDisplayArea,
     };
 }

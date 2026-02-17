@@ -37,15 +37,18 @@ export function DanmakuCanvas({ comments, currentTime, isPlaying, duration }: Da
   // Settings (read reactively)
   const [opacity, setOpacity] = React.useState(0.7);
   const [fontSize, setFontSize] = React.useState(20);
+  const [displayArea, setDisplayArea] = React.useState(0.5);
 
   useEffect(() => {
     const s = settingsStore.getSettings();
     setOpacity(s.danmakuOpacity);
     setFontSize(s.danmakuFontSize);
+    setDisplayArea(s.danmakuDisplayArea);
     const unsub = settingsStore.subscribe(() => {
       const ns = settingsStore.getSettings();
       setOpacity(ns.danmakuOpacity);
       setFontSize(ns.danmakuFontSize);
+      setDisplayArea(ns.danmakuDisplayArea);
     });
     return unsub;
   }, []);
@@ -86,6 +89,7 @@ export function DanmakuCanvas({ comments, currentTime, isPlaying, duration }: Da
 
     const rect = canvas.getBoundingClientRect();
     const canvasWidth = rect.width;
+    const effectiveHeight = rect.height * displayArea;
     const laneHeight = fontSize * LANE_HEIGHT_FACTOR;
 
     // Find comments in the time window [lastSpawn, time]
@@ -119,7 +123,7 @@ export function DanmakuCanvas({ comments, currentTime, isPlaying, duration }: Da
         let bestLane = -1;
         for (let lane = 0; lane < MAX_LANES; lane++) {
           const yPos = lane * laneHeight + fontSize;
-          if (yPos > rect.height - fontSize) break;
+          if (yPos > effectiveHeight - fontSize) break;
           if (laneSlotsRef.current[lane] <= time) {
             bestLane = lane;
             break;
@@ -142,7 +146,7 @@ export function DanmakuCanvas({ comments, currentTime, isPlaying, duration }: Da
         });
       } else {
         // Top or bottom: find center lane
-        const maxLanes = Math.floor(rect.height / laneHeight / 2); // only use top/bottom half
+        const maxLanes = Math.floor(effectiveHeight / laneHeight / 2); // only use top/bottom half
         let bestLane = -1;
         for (let lane = 0; lane < Math.min(maxLanes, MAX_LANES); lane++) {
           const laneKey = type === 'top' ? lane : MAX_LANES - 1 - lane;
@@ -156,7 +160,7 @@ export function DanmakuCanvas({ comments, currentTime, isPlaying, duration }: Da
 
         const y = type === 'top'
           ? bestLane * laneHeight + fontSize
-          : rect.height - bestLane * laneHeight - fontSize * 0.4;
+          : effectiveHeight - bestLane * laneHeight - fontSize * 0.4;
 
         activeRef.current.push({
           comment: { ...c, _expiry: time + TOP_BOTTOM_DURATION } as any,
@@ -170,7 +174,7 @@ export function DanmakuCanvas({ comments, currentTime, isPlaying, duration }: Da
     }
 
     lastSpawnTimeRef.current = windowEnd;
-  }, [comments, fontSize]);
+  }, [comments, fontSize, displayArea]);
 
   // Animation loop
   useEffect(() => {

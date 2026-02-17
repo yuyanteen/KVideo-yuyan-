@@ -1,0 +1,107 @@
+'use client';
+
+/**
+ * IPTV Page - Live TV channel viewer with M3U source management
+ */
+
+import { useState, useEffect } from 'react';
+import { useIPTVStore } from '@/lib/store/iptv-store';
+import { IPTVSourceManager } from '@/components/iptv/IPTVSourceManager';
+import { IPTVChannelGrid } from '@/components/iptv/IPTVChannelGrid';
+import { IPTVPlayer } from '@/components/iptv/IPTVPlayer';
+import { Icons } from '@/components/ui/Icon';
+import { AdminGate } from '@/components/AdminGate';
+import Link from 'next/link';
+import type { M3UChannel } from '@/lib/utils/m3u-parser';
+
+export default function IPTVPage() {
+  const { sources, cachedChannels, cachedGroups, refreshSources, isLoading, lastRefreshed } = useIPTVStore();
+  const [activeChannel, setActiveChannel] = useState<M3UChannel | null>(null);
+  const [showManager, setShowManager] = useState(false);
+
+  // Auto-refresh on first load if we have sources but no cached channels
+  useEffect(() => {
+    if (sources.length > 0 && cachedChannels.length === 0 && !isLoading) {
+      refreshSources();
+    }
+  }, [sources.length, cachedChannels.length, isLoading, refreshSources]);
+
+  return (
+    <AdminGate>
+      <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          {/* Header */}
+          <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/"
+                  className="w-10 h-10 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all duration-200 cursor-pointer"
+                  aria-label="返回首页"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Link>
+                <div>
+                  <h1 className="text-2xl font-bold text-[var(--text-color)] flex items-center gap-2">
+                    <Icons.TV size={24} className="text-[var(--accent-color)]" />
+                    直播
+                  </h1>
+                  <p className="text-sm text-[var(--text-color-secondary)]">
+                    {cachedChannels.length > 0 ? `${cachedChannels.length} 个频道` : 'IPTV 直播频道'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowManager(!showManager)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] text-sm text-[var(--text-color)] hover:border-[var(--accent-color)]/30 transition-all cursor-pointer"
+              >
+                <Icons.Settings size={16} />
+                管理源
+              </button>
+            </div>
+          </div>
+
+          {/* Source Manager (collapsible) */}
+          {showManager && (
+            <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
+              <IPTVSourceManager />
+            </div>
+          )}
+
+          {/* Loading State */}
+          {isLoading && (
+            <div className="text-center py-16">
+              <div className="w-10 h-10 border-2 border-[var(--accent-color)]/30 border-t-[var(--accent-color)] rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-sm text-[var(--text-color-secondary)]">正在加载频道列表...</p>
+            </div>
+          )}
+
+          {/* Channel Grid */}
+          {!isLoading && (
+            <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6">
+              <IPTVChannelGrid
+                channels={cachedChannels}
+                groups={cachedGroups}
+                onSelect={setActiveChannel}
+                activeChannel={activeChannel}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Player Overlay */}
+        {activeChannel && (
+          <IPTVPlayer
+            channel={activeChannel}
+            onClose={() => setActiveChannel(null)}
+            channels={cachedChannels}
+            onChannelChange={setActiveChannel}
+          />
+        )}
+      </div>
+    </AdminGate>
+  );
+}

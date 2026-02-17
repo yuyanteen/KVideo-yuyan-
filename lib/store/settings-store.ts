@@ -51,6 +51,7 @@ export interface AppSettings {
   danmakuApiUrl: string; // Self-hosted danmaku API endpoint
   danmakuOpacity: number; // 0.1 - 1.0
   danmakuFontSize: number; // px
+  danmakuDisplayArea: number; // 0.25 | 0.5 | 0.75 | 1.0
 }
 
 import { exportSettings, importSettings, SEARCH_HISTORY_KEY, WATCH_HISTORY_KEY } from './settings-helpers';
@@ -128,6 +129,7 @@ function getDefaultAppSettings(): AppSettings {
     danmakuApiUrl: process.env.NEXT_PUBLIC_DANMAKU_API_URL || '',
     danmakuOpacity: 0.7,
     danmakuFontSize: 20,
+    danmakuDisplayArea: 0.5,
   };
 }
 
@@ -209,6 +211,7 @@ export const settingsStore = {
         danmakuApiUrl: typeof parsed.danmakuApiUrl === 'string' ? (parsed.danmakuApiUrl || process.env.NEXT_PUBLIC_DANMAKU_API_URL || '') : (process.env.NEXT_PUBLIC_DANMAKU_API_URL || ''),
         danmakuOpacity: typeof parsed.danmakuOpacity === 'number' ? parsed.danmakuOpacity : 0.7,
         danmakuFontSize: typeof parsed.danmakuFontSize === 'number' ? parsed.danmakuFontSize : 20,
+        danmakuDisplayArea: typeof parsed.danmakuDisplayArea === 'number' ? parsed.danmakuDisplayArea : 0.5,
       };
     } catch {
       // Even if localStorage fails, we should return defaults + ENV subscriptions

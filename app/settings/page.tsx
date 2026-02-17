@@ -59,6 +59,8 @@ export default function SettingsPage() {
     handleDanmakuOpacityChange,
     danmakuFontSize,
     handleDanmakuFontSizeChange,
+    danmakuDisplayArea,
+    handleDanmakuDisplayAreaChange,
   } = useSettingsPage();
 
   return (
@@ -83,6 +85,8 @@ export default function SettingsPage() {
           onDanmakuOpacityChange={handleDanmakuOpacityChange}
           danmakuFontSize={danmakuFontSize}
           onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
+          danmakuDisplayArea={danmakuDisplayArea}
+          onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
         />
 
         {/* Display Settings */}

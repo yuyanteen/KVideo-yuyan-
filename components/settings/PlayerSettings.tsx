@@ -19,9 +19,17 @@ interface PlayerSettingsProps {
     onDanmakuOpacityChange: (value: number) => void;
     danmakuFontSize: number;
     onDanmakuFontSizeChange: (value: number) => void;
+    danmakuDisplayArea: number;
+    onDanmakuDisplayAreaChange: (value: number) => void;
 }
 
 const DANMAKU_FONT_SIZES = [14, 18, 20, 24, 28];
+const DANMAKU_DISPLAY_AREAS = [
+    { value: 0.25, label: '1/4屏' },
+    { value: 0.5, label: '半屏' },
+    { value: 0.75, label: '3/4屏' },
+    { value: 1.0, label: '全屏' },
+];
 
 export function PlayerSettings({
     fullscreenType,
@@ -34,6 +42,8 @@ export function PlayerSettings({
     onDanmakuOpacityChange,
     danmakuFontSize,
     onDanmakuFontSizeChange,
+    danmakuDisplayArea,
+    onDanmakuDisplayAreaChange,
 }: PlayerSettingsProps) {
     return (
         <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
@@ -179,6 +189,27 @@ export function PlayerSettings({
                                             }`}
                                     >
                                         {size}px
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Display Area */}
+                        <div>
+                            <label className="block text-sm font-medium text-[var(--text-color)] mb-2">
+                                弹幕显示区域
+                            </label>
+                            <div className="flex gap-2">
+                                {DANMAKU_DISPLAY_AREAS.map(({ value, label }) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => onDanmakuDisplayAreaChange(value)}
+                                        className={`px-3 py-1.5 rounded-[var(--radius-2xl)] border text-sm font-medium transition-all duration-200 cursor-pointer ${danmakuDisplayArea === value
+                                            ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white shadow-[0_4px_12px_rgba(var(--accent-color-rgb),0.3)]'
+                                            : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)]'
+                                            }`}
+                                    >
+                                        {label}
                                     </button>
                                 ))}
                             </div>

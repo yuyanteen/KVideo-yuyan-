@@ -28,6 +28,7 @@ export interface ModeSettings {
   danmakuApiUrl: string;
   danmakuOpacity: number;
   danmakuFontSize: number;
+  danmakuDisplayArea: number;
 }
 
 function getDefaultModeSettings(): ModeSettings {
@@ -51,6 +52,7 @@ function getDefaultModeSettings(): ModeSettings {
     danmakuApiUrl: process.env.NEXT_PUBLIC_DANMAKU_API_URL || '',
     danmakuOpacity: 0.7,
     danmakuFontSize: 20,
+    danmakuDisplayArea: 0.5,
   };
 }
 
@@ -87,6 +89,7 @@ export const premiumModeSettingsStore = {
         danmakuApiUrl: typeof parsed.danmakuApiUrl === 'string' ? (parsed.danmakuApiUrl || process.env.NEXT_PUBLIC_DANMAKU_API_URL || '') : (process.env.NEXT_PUBLIC_DANMAKU_API_URL || ''),
         danmakuOpacity: typeof parsed.danmakuOpacity === 'number' ? parsed.danmakuOpacity : 0.7,
         danmakuFontSize: typeof parsed.danmakuFontSize === 'number' ? parsed.danmakuFontSize : 20,
+        danmakuDisplayArea: typeof parsed.danmakuDisplayArea === 'number' ? parsed.danmakuDisplayArea : 0.5,
       };
     } catch {
       return getDefaultModeSettings();
@@ -146,6 +149,7 @@ export function getModeSettings(isPremium: boolean): ModeSettings {
     danmakuApiUrl: s.danmakuApiUrl,
     danmakuOpacity: s.danmakuOpacity,
     danmakuFontSize: s.danmakuFontSize,
+    danmakuDisplayArea: s.danmakuDisplayArea,
   };
 }
 

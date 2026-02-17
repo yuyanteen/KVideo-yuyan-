@@ -101,6 +101,7 @@ export interface VideoHistoryItem {
   poster?: string;
   episodes: Episode[];
   showIdentifier: string; // Unique identifier for deduplication
+  sourceMap?: Record<string, string | number>; // Maps source name to videoId for that source
   vod_actor?: string;
   type_name?: string;
   vod_area?: string;

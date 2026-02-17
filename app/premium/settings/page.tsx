@@ -40,6 +40,8 @@ export default function PremiumSettingsPage() {
         handleDanmakuOpacityChange,
         danmakuFontSize,
         handleDanmakuFontSizeChange,
+        danmakuDisplayArea,
+        handleDanmakuDisplayAreaChange,
     } = usePremiumSettingsPage();
 
     return (
@@ -79,6 +81,8 @@ export default function PremiumSettingsPage() {
                     onDanmakuOpacityChange={handleDanmakuOpacityChange}
                     danmakuFontSize={danmakuFontSize}
                     onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
+                    danmakuDisplayArea={danmakuDisplayArea}
+                    onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
                 />
 
                 {/* Display Settings */}

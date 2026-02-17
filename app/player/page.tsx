@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState, useCallback } from 'react';
+import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { VideoPlayer } from '@/components/player/VideoPlayer';
@@ -8,6 +8,7 @@ import { VideoMetadata } from '@/components/player/VideoMetadata';
 import { EpisodeList } from '@/components/player/EpisodeList';
 import { PlayerError } from '@/components/player/PlayerError';
 import { SourceInfo } from '@/components/player/EpisodeList';
+import type { VideoSource } from '@/lib/types';
 import { useVideoPlayer } from '@/lib/hooks/useVideoPlayer';
 import { useHistory } from '@/lib/store/history-store';
 import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
@@ -16,6 +17,7 @@ import { PlayerNavbar } from '@/components/player/PlayerNavbar';
 import { settingsStore } from '@/lib/store/settings-store';
 import { premiumModeSettingsStore } from '@/lib/store/premium-mode-settings';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { getSourceName } from '@/lib/utils/source-names';
 
 function PlayerContent() {
   const searchParams = useSearchParams();
@@ -62,6 +64,8 @@ function PlayerContent() {
   } = useVideoPlayer(videoId, source, episodeParam, isReversed);
 
   // Parse grouped sources if available
+  const [discoveredSources, setDiscoveredSources] = useState<SourceInfo[]>([]);
+
   const groupedSources = useMemo<SourceInfo[]>(() => {
     let sources: SourceInfo[] = [];
     if (groupedSourcesParam) {
@@ -72,17 +76,106 @@ function PlayerContent() {
       }
     }
 
+    // Merge in discovered sources (from background search)
+    if (discoveredSources.length > 0) {
+      for (const ds of discoveredSources) {
+        if (!sources.find(s => s.source === ds.source)) {
+          sources.push(ds);
+        }
+      }
+    }
+
     // Always ensure the current source is in the list
     if (source && !sources.find(s => s.source === source)) {
       sources.unshift({
         id: videoId || '',
         source: source,
-        sourceName: source,
+        sourceName: getSourceName(source),
         pic: videoData?.vod_pic
       });
     }
     return sources;
-  }, [groupedSourcesParam, source, videoId, videoData?.vod_pic]);
+  }, [groupedSourcesParam, source, videoId, videoData?.vod_pic, discoveredSources]);
+
+  // Background fetch alternative sources when none provided or when existing ones lack full info
+  const fetchedSourcesRef = useRef(false);
+  useEffect(() => {
+    if (fetchedSourcesRef.current || !title) return;
+
+    // Check if existing grouped sources already have full info (pic + latency)
+    let existingSources: SourceInfo[] = [];
+    if (groupedSourcesParam) {
+      try { existingSources = JSON.parse(groupedSourcesParam); } catch {}
+    }
+    const hasFullInfo = existingSources.length > 1 &&
+      existingSources.every(s => s.pic || s.latency !== undefined);
+    if (hasFullInfo) return;
+
+    fetchedSourcesRef.current = true;
+
+    const settings = settingsStore.getSettings();
+    const sourcesForMode = isPremium ? settings.premiumSources : settings.sources;
+    const allSources = sourcesForMode?.filter((s: VideoSource) => s.enabled !== false) || [];
+    // Only search other sources (not the current one)
+    const otherSources = allSources.filter((s: VideoSource) => s.id !== source);
+    if (otherSources.length === 0) return;
+
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const response = await fetch('/api/search-parallel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: title, sources: otherSources, page: 1 }),
+          signal: controller.signal,
+        });
+        if (!response.ok || !response.body) return;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        const found: SourceInfo[] = [];
+        const normalizedTitle = title.toLowerCase().trim();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'videos' && data.videos) {
+                // Find exact or close title match
+                const match = data.videos.find((v: any) =>
+                  v.vod_name?.toLowerCase().trim() === normalizedTitle
+                );
+                if (match) {
+                  found.push({
+                    id: match.vod_id,
+                    source: match.source,
+                    sourceName: match.sourceDisplayName || getSourceName(match.source),
+                    latency: match.latency,
+                    pic: match.vod_pic,
+                  });
+                  // Update state incrementally
+                  setDiscoveredSources([...found]);
+                }
+              }
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      } catch {
+        // Silently ignore - this is a background enhancement
+      }
+    })();
+
+    return () => controller.abort();
+  }, [title, source, groupedSourcesParam, isPremium]);
 
   // Track current source for switching
   const [currentSourceId, setCurrentSourceId] = useState(source);
@@ -251,8 +344,17 @@ function PlayerContent() {
                       params.set('id', String(newSource.id));
                       params.set('source', newSource.source);
                       params.set('title', title || '');
-                      if (groupedSourcesParam) {
+                      // Preserve current episode index
+                      params.set('episode', currentEpisode.toString());
+                      // Pass all known sources so switching persists
+                      const allSources = groupedSources.length > 0 ? groupedSources : [];
+                      if (allSources.length > 1) {
+                        params.set('groupedSources', JSON.stringify(allSources));
+                      } else if (groupedSourcesParam) {
                         params.set('groupedSources', groupedSourcesParam);
+                      }
+                      if (isPremium) {
+                        params.set('premium', '1');
                       }
                       setCurrentSourceId(newSource.source);
                       router.replace(`/player?${params.toString()}`, { scroll: false });

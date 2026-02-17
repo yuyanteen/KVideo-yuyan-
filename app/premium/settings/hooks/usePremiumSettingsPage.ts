@@ -20,6 +20,7 @@ export function usePremiumSettingsPage() {
     const [danmakuApiUrl, setDanmakuApiUrl] = useState('');
     const [danmakuOpacity, setDanmakuOpacity] = useState(0.7);
     const [danmakuFontSize, setDanmakuFontSize] = useState(20);
+    const [danmakuDisplayArea, setDanmakuDisplayArea] = useState(0.5);
 
     useEffect(() => {
         // Sources come from main settings store
@@ -36,6 +37,7 @@ export function usePremiumSettingsPage() {
         setDanmakuApiUrl(modeSettings.danmakuApiUrl);
         setDanmakuOpacity(modeSettings.danmakuOpacity);
         setDanmakuFontSize(modeSettings.danmakuFontSize);
+        setDanmakuDisplayArea(modeSettings.danmakuDisplayArea);
     }, []);
 
     // --- Source management (uses main settingsStore) ---
@@ -121,6 +123,11 @@ export function usePremiumSettingsPage() {
         savePremiumModeSetting({ danmakuFontSize: value });
     };
 
+    const handleDanmakuDisplayAreaChange = (value: number) => {
+        setDanmakuDisplayArea(value);
+        savePremiumModeSetting({ danmakuDisplayArea: value });
+    };
+
     return {
         premiumSources,
         isAddModalOpen,
@@ -151,5 +158,7 @@ export function usePremiumSettingsPage() {
         handleDanmakuOpacityChange,
         danmakuFontSize,
         handleDanmakuFontSizeChange,
+        danmakuDisplayArea,
+        handleDanmakuDisplayAreaChange,
     };
 }

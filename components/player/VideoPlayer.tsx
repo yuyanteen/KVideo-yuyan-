@@ -94,15 +94,10 @@ export function VideoPlayer({
   const getSavedProgress = () => {
     if (!videoId) return 0;
 
-    // Directly check HistoryStore for progress
-    // We prioritize a strict match (including source), but fall back to any match for this video/episode
-    // This fixes issues where the source parameter might be missing or different
+    // Match by normalized title + episode index (source-agnostic)
+    const normalizedTitle = title.toLowerCase().trim();
     const historyItem = viewingHistory.find(item =>
-      item.videoId.toString() === videoId?.toString() &&
-      item.episodeIndex === currentEpisode &&
-      (source ? item.source === source : true)
-    ) || viewingHistory.find(item =>
-      item.videoId.toString() === videoId?.toString() &&
+      item.title.toLowerCase().trim() === normalizedTitle &&
       item.episodeIndex === currentEpisode
     );
 
