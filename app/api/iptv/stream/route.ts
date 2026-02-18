@@ -52,12 +52,21 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; KVideo/1.0)',
-        'Accept': '*/*',
-      },
-    });
+    const parsedUrl = new URL(url);
+    const fetchHeaders: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (compatible; KVideo/1.0)',
+      'Accept': '*/*',
+      'Referer': `${parsedUrl.protocol}//${parsedUrl.host}/`,
+      'Origin': `${parsedUrl.protocol}//${parsedUrl.host}`,
+    };
+
+    // Forward Range header for partial content requests
+    const rangeHeader = request.headers.get('range');
+    if (rangeHeader) {
+      fetchHeaders['Range'] = rangeHeader;
+    }
+
+    const response = await fetch(url, { headers: fetchHeaders });
 
     if (!response.ok) {
       return NextResponse.json(
@@ -96,13 +105,23 @@ export async function GET(request: NextRequest) {
       const body = response.body;
       const forwardContentType = contentType || 'video/mp2t';
 
+      const responseHeaders: Record<string, string> = {
+        'Content-Type': forwardContentType,
+        'Cache-Control': 'public, max-age=60',
+        ...corsHeaders,
+      };
+
+      // Forward range-related headers
+      const contentRange = response.headers.get('content-range');
+      if (contentRange) responseHeaders['Content-Range'] = contentRange;
+      const acceptRanges = response.headers.get('accept-ranges');
+      if (acceptRanges) responseHeaders['Accept-Ranges'] = acceptRanges;
+      const contentLength = response.headers.get('content-length');
+      if (contentLength) responseHeaders['Content-Length'] = contentLength;
+
       return new NextResponse(body, {
-        status: 200,
-        headers: {
-          'Content-Type': forwardContentType,
-          'Cache-Control': 'public, max-age=60',
-          ...corsHeaders,
-        },
+        status: response.status,
+        headers: responseHeaders,
       });
     }
   } catch (e) {

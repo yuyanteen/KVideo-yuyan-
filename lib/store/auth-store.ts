@@ -3,10 +3,28 @@
  * NOT Zustand — needs to be synchronous at import time for store key generation
  */
 
+export type Role = 'super_admin' | 'admin' | 'viewer';
+
+export type Permission =
+  | 'source_management'
+  | 'account_management'
+  | 'danmaku_api'
+  | 'data_management'
+  | 'player_settings'
+  | 'danmaku_appearance'
+  | 'view_settings'
+  | 'iptv_access';
+
+const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  super_admin: ['source_management', 'account_management', 'danmaku_api', 'data_management', 'player_settings', 'danmaku_appearance', 'view_settings', 'iptv_access'],
+  admin: ['player_settings', 'danmaku_appearance', 'view_settings', 'iptv_access'],
+  viewer: ['view_settings'],
+};
+
 export interface AuthSession {
   profileId: string;
   name: string;
-  role: 'admin' | 'viewer';
+  role: Role;
 }
 
 const SESSION_KEY = 'kvideo-session';
@@ -42,6 +60,8 @@ export function clearSession(): void {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(SESSION_KEY);
+  // Clear search cache so new session gets fresh results
+  localStorage.removeItem('kvideo_search_cache');
   // Also clear old unlock keys for backward compat cleanup
   sessionStorage.removeItem('kvideo-unlocked');
   localStorage.removeItem('kvideo-unlocked');
@@ -50,7 +70,20 @@ export function clearSession(): void {
 export function isAdmin(): boolean {
   const session = getSession();
   if (!session) return true; // No auth configured = full access
-  return session.role === 'admin';
+  return session.role === 'admin' || session.role === 'super_admin';
+}
+
+export function hasPermission(permission: Permission): boolean {
+  const session = getSession();
+  if (!session) return true; // No auth configured = full access
+  return ROLE_PERMISSIONS[session.role]?.includes(permission) ?? false;
+}
+
+export function hasRole(minimumRole: Role): boolean {
+  const session = getSession();
+  if (!session) return true; // No auth configured = full access
+  const hierarchy: Role[] = ['viewer', 'admin', 'super_admin'];
+  return hierarchy.indexOf(session.role) >= hierarchy.indexOf(minimumRole);
 }
 
 export function getProfileId(): string {

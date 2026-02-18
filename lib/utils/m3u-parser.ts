@@ -11,6 +11,8 @@ export interface M3UChannel {
   tvgId?: string;
   tvgName?: string;
   routes?: string[];
+  sourceId?: string;
+  sourceName?: string;
 }
 
 export interface M3UPlaylist {
@@ -86,7 +88,7 @@ export function groupChannelsByName(channels: M3UChannel[]): M3UChannel[] {
   const groups = new Map<string, M3UChannel>();
 
   for (const ch of channels) {
-    const key = ch.name.toLowerCase().trim();
+    const key = `${ch.sourceId || ''}::${ch.name.toLowerCase().trim()}`;
     const existing = groups.get(key);
     if (existing) {
       if (!existing.routes) {

@@ -11,6 +11,8 @@ import { Icons } from '@/components/ui/Icon';
 import { SourceBadgeItem } from './SourceBadgeItem';
 import { useKeyboardNavigation } from '@/lib/hooks/useKeyboardNavigation';
 
+const EXPAND_KEY = 'kvideo_source_badges_expanded';
+
 interface Source {
   id: string;
   name: string;
@@ -24,12 +26,24 @@ interface SourceBadgeListProps {
 }
 
 export function SourceBadgeList({ sources, selectedSources, onToggleSource }: SourceBadgeListProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem(EXPAND_KEY);
+    return saved !== 'false'; // default to expanded
+  });
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [hasOverflow, setHasOverflow] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const badgeContainerRef = useRef<HTMLDivElement>(null);
   const badgeRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => {
+      const next = !prev;
+      localStorage.setItem(EXPAND_KEY, String(next));
+      return next;
+    });
+  }, []);
 
   // Keyboard navigation
   useKeyboardNavigation({
@@ -101,7 +115,7 @@ export function SourceBadgeList({ sources, selectedSources, onToggleSource }: So
 
         {hasOverflow && (
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={toggleExpanded}
             className="mt-2 text-xs text-[var(--text-color-secondary)] hover:text-[var(--accent-color)]
                      flex items-center gap-1 transition-colors self-start cursor-pointer"
           >

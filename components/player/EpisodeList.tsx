@@ -74,12 +74,46 @@ export function EpisodeList({
   useEffect(() => {
     if (!sources) return;
     const initial: Record<string, number> = {};
+    let hasMissing = false;
     sources.forEach(s => {
       if (s.latency !== undefined) {
         initial[s.source] = s.latency;
+      } else {
+        hasMissing = true;
       }
     });
     setLatencies(initial);
+
+    // Auto-refresh latencies for sources that don't have them
+    if (hasMissing && sources.length > 1) {
+      const autoRefresh = async () => {
+        const missing = sources.filter(s => s.latency === undefined);
+        const results = await Promise.all(
+          missing.map(async (source) => {
+            try {
+              const response = await fetch('/api/ping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: source.source }),
+              });
+              if (response.ok) {
+                const data = await response.json();
+                return { source: source.source, latency: data.latency as number | undefined };
+              }
+            } catch { /* ignore */ }
+            return { source: source.source, latency: undefined };
+          })
+        );
+        setLatencies(prev => {
+          const updated = { ...prev };
+          results.forEach(({ source, latency }) => {
+            if (latency !== undefined) updated[source] = latency;
+          });
+          return updated;
+        });
+      };
+      autoRefresh();
+    }
   }, [sources]);
 
   // Refresh latencies

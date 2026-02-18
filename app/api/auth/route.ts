@@ -19,7 +19,7 @@ const effectiveAdminPassword = ADMIN_PASSWORD || ACCESS_PASSWORD;
 interface AccountEntry {
   password: string;
   name: string;
-  role: 'admin' | 'viewer';
+  role: 'super_admin' | 'admin' | 'viewer';
 }
 
 function parseAccounts(): AccountEntry[] {
@@ -32,10 +32,11 @@ function parseAccounts(): AccountEntry[] {
       const parts = entry.split(':');
       if (parts.length < 2) return null;
       const [password, name, role] = parts;
+      const parsedRole = role?.trim();
       return {
         password: password.trim(),
         name: name.trim(),
-        role: (role?.trim() === 'admin' ? 'admin' : 'viewer') as 'admin' | 'viewer',
+        role: (parsedRole === 'super_admin' ? 'super_admin' : parsedRole === 'admin' ? 'admin' : 'viewer') as 'super_admin' | 'admin' | 'viewer',
       };
     })
     .filter((a): a is AccountEntry => a !== null && a.password.length > 0 && a.name.length > 0);
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         valid: true,
         name: '管理员',
-        role: 'admin',
+        role: 'super_admin',
         profileId,
         persistSession: PERSIST_SESSION,
       });

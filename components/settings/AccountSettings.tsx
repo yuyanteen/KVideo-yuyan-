@@ -1,20 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getSession, clearSession } from '@/lib/store/auth-store';
+import { getSession, clearSession, hasPermission, type Role } from '@/lib/store/auth-store';
 import { SettingsSection } from './SettingsSection';
 import { Icons } from '@/components/ui/Icon';
 import { LogOut, Shield, Info } from 'lucide-react';
 
 interface AccountInfo {
   name: string;
-  role: 'admin' | 'viewer';
+  role: Role;
 }
 
 interface ConfigEntry {
   password: string;
   name: string;
-  role: 'admin' | 'viewer';
+  role: Role;
 }
 
 export function AccountSettings() {
@@ -50,7 +50,7 @@ export function AccountSettings() {
     window.location.reload();
   };
 
-  const isAdmin = session?.role === 'admin';
+  const canManageAccounts = hasPermission('account_management');
 
   // Config generator helpers
   const addConfigEntry = () => {
@@ -70,7 +70,7 @@ export function AccountSettings() {
   const generateAccountsString = () => {
     return configEntries
       .filter(e => e.password.trim() && e.name.trim())
-      .map(e => `${e.password}:${e.name}${e.role === 'admin' ? ':admin' : ''}`)
+      .map(e => `${e.password}:${e.name}${e.role !== 'viewer' ? ':' + e.role : ''}`)
       .join(',');
   };
 
@@ -87,7 +87,7 @@ export function AccountSettings() {
     // Filter out removed accounts and the standalone admin password account
     const existingEntries: ConfigEntry[] = accounts
       .filter((_, i) => !removedAccounts.has(i))
-      .filter(a => !(a.name === '管理员' && hasAdminPassword))
+      .filter(a => !(a.name === '超级管理员' && hasAdminPassword))
       .map(a => ({
         password: '',
         name: a.name,
@@ -124,9 +124,9 @@ export function AccountSettings() {
               <div>
                 <p className="text-sm font-medium text-[var(--text-color)]">{session.name}</p>
                 <div className="flex items-center gap-1.5">
-                  <Shield size={12} className={session.role === 'admin' ? 'text-[var(--accent-color)]' : 'text-[var(--text-color-secondary)]'} />
+                  <Shield size={12} className={session.role === 'super_admin' || session.role === 'admin' ? 'text-[var(--accent-color)]' : 'text-[var(--text-color-secondary)]'} />
                   <span className="text-xs text-[var(--text-color-secondary)]">
-                    {session.role === 'admin' ? '管理员' : '观众'}
+                    {session.role === 'super_admin' ? '超级管理员' : session.role === 'admin' ? '管理员' : '观众'}
                   </span>
                 </div>
               </div>
@@ -144,8 +144,8 @@ export function AccountSettings() {
           </div>
         )}
 
-        {/* Account List (Admin only) */}
-        {isAdmin && visibleAccounts.length > 0 && (
+        {/* Account List (Account managers only) */}
+        {canManageAccounts && visibleAccounts.length > 0 && (
           <div>
             <h3 className="text-sm font-medium text-[var(--text-color)] mb-3 flex items-center gap-2">
               <Icons.Users size={16} className="text-[var(--accent-color)]" />
@@ -167,11 +167,11 @@ export function AccountSettings() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`text-xs px-2 py-0.5 rounded-[var(--radius-full)] ${
-                        account.role === 'admin'
+                        account.role === 'super_admin' || account.role === 'admin'
                           ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
                           : 'bg-[var(--glass-bg)] text-[var(--text-color-secondary)] border border-[var(--glass-border)]'
                       }`}>
-                        {account.role === 'admin' ? '管理员' : '观众'}
+                        {account.role === 'super_admin' ? '超级管理员' : account.role === 'admin' ? '管理员' : '观众'}
                       </span>
                       <button
                         onClick={() => handleRemoveAccount(index)}
@@ -211,8 +211,8 @@ export function AccountSettings() {
           </div>
         )}
 
-        {/* Config Generator (Admin only) */}
-        {isAdmin && (
+        {/* Config Generator (Account managers only) */}
+        {canManageAccounts && (
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-[var(--text-color)] flex items-center gap-2">
@@ -276,6 +276,7 @@ export function AccountSettings() {
                         >
                           <option value="viewer">观众</option>
                           <option value="admin">管理员</option>
+                          <option value="super_admin">超级管理员</option>
                         </select>
                       </div>
                     </div>

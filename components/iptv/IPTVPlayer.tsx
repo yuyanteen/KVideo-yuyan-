@@ -6,10 +6,22 @@
  * Routes streams through proxy to avoid CORS when direct access fails.
  */
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { Icons } from '@/components/ui/Icon';
 import type { M3UChannel } from '@/lib/utils/m3u-parser';
+
+const HLS_LIVE_CONFIG: Partial<Hls['config']> = {
+  enableWorker: true,
+  lowLatencyMode: true,
+  liveDurationInfinity: true,
+  manifestLoadingTimeOut: 10000,
+  manifestLoadingMaxRetry: 2,
+  levelLoadingTimeOut: 10000,
+  fragLoadingTimeOut: 15000,
+};
+
+const LOADING_TIMEOUT_MS = 20000;
 
 interface IPTVPlayerProps {
   channel: M3UChannel;
@@ -37,9 +49,11 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
   const containerRef = useRef<HTMLDivElement>(null);
   const activeChannelRef = useRef<HTMLButtonElement>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [sidebarSearch, setSidebarSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -140,16 +154,43 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = undefined;
+    }
     video.removeAttribute('src');
     video.load();
 
     const proxiedUrl = getProxiedUrl(url);
 
+    // Global loading timeout
+    let loadingResolved = false;
+    const markLoaded = () => {
+      if (loadingResolved) return;
+      loadingResolved = true;
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = undefined;
+      }
+      setIsLoading(false);
+    };
+    const markError = (msg: string) => {
+      if (loadingResolved) return;
+      loadingResolved = true;
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = undefined;
+      }
+      setIsLoading(false);
+      setError(msg);
+    };
+
+    loadingTimeoutRef.current = setTimeout(() => {
+      markError('加载超时，请尝试其他线路或频道');
+    }, LOADING_TIMEOUT_MS);
+
     if (Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-      });
+      const hls = new Hls(HLS_LIVE_CONFIG);
       hlsRef.current = hls;
 
       let triedProxy = false;
@@ -157,16 +198,15 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
 
       const tryDirectVideo = (directUrl: string) => {
         if (triedDirect) {
-          setIsLoading(false);
-          setError('播放错误，请尝试其他线路或频道');
+          markError('播放错误，请尝试其他线路或频道');
           return;
         }
         triedDirect = true;
         const vid = videoRef.current;
         if (!vid) return;
         vid.src = directUrl;
-        vid.addEventListener('loadedmetadata', () => {
-          setIsLoading(false);
+        vid.addEventListener('canplay', () => {
+          markLoaded();
           vid.play().catch(() => {});
         }, { once: true });
         vid.addEventListener('error', () => {
@@ -175,17 +215,15 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
             const vid2 = videoRef.current;
             if (!vid2) return;
             vid2.src = proxiedUrl;
-            vid2.addEventListener('loadedmetadata', () => {
-              setIsLoading(false);
+            vid2.addEventListener('canplay', () => {
+              markLoaded();
               vid2.play().catch(() => {});
             }, { once: true });
             vid2.addEventListener('error', () => {
-              setIsLoading(false);
-              setError('播放错误，请尝试其他线路或频道');
+              markError('播放错误，请尝试其他线路或频道');
             }, { once: true });
           } else {
-            setIsLoading(false);
-            setError('播放错误，请尝试其他线路或频道');
+            markError('播放错误，请尝试其他线路或频道');
           }
         }, { once: true });
       };
@@ -197,15 +235,12 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
         }
         triedProxy = true;
         hls.destroy();
-        const hlsProxy = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-        });
+        const hlsProxy = new Hls(HLS_LIVE_CONFIG);
         hlsRef.current = hlsProxy;
         hlsProxy.loadSource(proxiedUrl);
         hlsProxy.attachMedia(video);
         hlsProxy.on(Hls.Events.MANIFEST_PARSED, () => {
-          setIsLoading(false);
+          markLoaded();
           video.play().catch(() => {});
         });
         hlsProxy.on(Hls.Events.ERROR, (_, data) => {
@@ -225,7 +260,7 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setIsLoading(false);
+        markLoaded();
         video.play().catch(() => {});
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -242,37 +277,35 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS (Safari/iOS)
       video.src = url;
-      video.addEventListener('loadedmetadata', () => {
-        setIsLoading(false);
+      video.addEventListener('canplay', () => {
+        markLoaded();
         video.play().catch(() => {});
       }, { once: true });
       video.addEventListener('error', () => {
         video.src = proxiedUrl;
-        video.addEventListener('loadedmetadata', () => {
-          setIsLoading(false);
+        video.addEventListener('canplay', () => {
+          markLoaded();
           video.play().catch(() => {});
         }, { once: true });
         video.addEventListener('error', () => {
-          setIsLoading(false);
-          setError('播放错误');
+          markError('播放错误');
         }, { once: true });
       }, { once: true });
     } else {
       // Direct video fallback
       video.src = url;
-      video.addEventListener('loadedmetadata', () => {
-        setIsLoading(false);
+      video.addEventListener('canplay', () => {
+        markLoaded();
         video.play().catch(() => {});
       }, { once: true });
       video.addEventListener('error', () => {
         video.src = proxiedUrl;
-        video.addEventListener('loadedmetadata', () => {
-          setIsLoading(false);
+        video.addEventListener('canplay', () => {
+          markLoaded();
           video.play().catch(() => {});
         }, { once: true });
         video.addEventListener('error', () => {
-          setIsLoading(false);
-          setError('播放错误，请尝试其他频道');
+          markError('播放错误，请尝试其他频道');
         }, { once: true });
       }, { once: true });
     }
@@ -285,6 +318,10 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
+      }
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = undefined;
       }
     };
   }, [currentUrl, loadChannel]);
@@ -315,11 +352,14 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
     if (value > 0 && video.muted) video.muted = false;
   };
 
+  const progressRef = useRef<HTMLDivElement>(null);
+
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isLive) return;
     const video = videoRef.current;
-    if (!video || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
+    const bar = progressRef.current;
+    if (!video || !duration || !bar) return;
+    const rect = bar.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     video.currentTime = ratio * duration;
   };
@@ -333,7 +373,70 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
     }
   };
 
+  // Keyboard shortcuts (matching main video player)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      resetControlsTimeout();
+      const video = videoRef.current;
+      if (!video) return;
+
+      switch (e.key.toLowerCase()) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'f':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case 'm':
+          e.preventDefault();
+          toggleMute();
+          break;
+        case 'escape':
+          e.preventDefault();
+          onClose();
+          break;
+        case 'arrowright':
+        case 'l':
+          e.preventDefault();
+          if (!isLive && isFinite(video.duration)) {
+            video.currentTime = Math.min(video.duration, video.currentTime + 10);
+          }
+          break;
+        case 'arrowleft':
+        case 'j':
+          e.preventDefault();
+          if (!isLive && isFinite(video.duration)) {
+            video.currentTime = Math.max(0, video.currentTime - 10);
+          }
+          break;
+        case 'arrowup':
+          e.preventDefault();
+          video.volume = Math.min(1, video.volume + 0.1);
+          if (video.muted) video.muted = false;
+          break;
+        case 'arrowdown':
+          e.preventDefault();
+          video.volume = Math.max(0, video.volume - 0.1);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
+
   const VolumeIcon = isMuted || volume === 0 ? Icons.VolumeX : volume < 0.5 ? Icons.Volume1 : Icons.Volume2;
+
+  const filteredSidebarChannels = useMemo(() => {
+    if (!sidebarSearch.trim()) return channels;
+    const q = sidebarSearch.toLowerCase().trim();
+    return channels.filter(ch => ch.name.toLowerCase().includes(q));
+  }, [channels, sidebarSearch]);
 
   return (
     <div
@@ -426,11 +529,12 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
           {!isLive && duration > 0 && (
             <div className="px-4 pt-2">
               <div
+                ref={progressRef}
                 className="group h-1 hover:h-2 bg-white/20 rounded-full cursor-pointer transition-all relative"
                 onClick={(e) => { e.stopPropagation(); handleSeek(e); }}
               >
                 <div
-                  className="h-full bg-[var(--accent-color)] rounded-full relative"
+                  className="h-full bg-[var(--accent-color)] rounded-full relative pointer-events-none"
                   style={{ width: `${(currentTime / duration) * 100}%` }}
                 >
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -526,17 +630,32 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
       {/* Sidebar */}
       {showSidebar && (
         <div data-sidebar className="w-72 bg-[#111] border-l border-white/10 overflow-y-auto flex-shrink-0">
-          <div className="p-3 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#111] z-10">
-            <h3 className="text-white text-sm font-medium">频道列表</h3>
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowSidebar(false); }}
-              className="text-white/50 hover:text-white cursor-pointer"
-            >
-              <Icons.X size={16} />
-            </button>
+          <div className="sticky top-0 bg-[#111] z-10">
+            <div className="p-3 border-b border-white/10 flex items-center justify-between">
+              <h3 className="text-white text-sm font-medium">频道列表</h3>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowSidebar(false); }}
+                className="text-white/50 hover:text-white cursor-pointer"
+              >
+                <Icons.X size={16} />
+              </button>
+            </div>
+            <div className="px-3 py-2 border-b border-white/10">
+              <div className="relative">
+                <Icons.Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
+                <input
+                  type="text"
+                  placeholder="搜索频道..."
+                  value={sidebarSearch}
+                  onChange={(e) => setSidebarSearch(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full pl-7 pr-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-white/20"
+                />
+              </div>
+            </div>
           </div>
           <div className="p-1">
-            {channels.map((ch, i) => {
+            {filteredSidebarChannels.map((ch, i) => {
               const isActive = ch.name === channel.name && ch.url === channel.url;
               return (
                 <button

@@ -21,6 +21,7 @@ interface PlayerSettingsProps {
     onDanmakuFontSizeChange: (value: number) => void;
     danmakuDisplayArea: number;
     onDanmakuDisplayAreaChange: (value: number) => void;
+    showDanmakuApi?: boolean;
 }
 
 const DANMAKU_FONT_SIZES = [14, 18, 20, 24, 28];
@@ -44,6 +45,7 @@ export function PlayerSettings({
     onDanmakuFontSizeChange,
     danmakuDisplayArea,
     onDanmakuDisplayAreaChange,
+    showDanmakuApi = true,
 }: PlayerSettingsProps) {
     return (
         <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
@@ -142,6 +144,7 @@ export function PlayerSettings({
 
                     {/* API URL */}
                     <div className="space-y-4">
+                        {showDanmakuApi && (
                         <div>
                             <label className="block text-sm font-medium text-[var(--text-color)] mb-2">
                                 API 地址
@@ -157,6 +160,7 @@ export function PlayerSettings({
                                 兼容 <a href="https://github.com/huangxd-/danmu_api" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-color)] hover:underline">danmu_api</a> 格式的弹幕聚合服务
                             </p>
                         </div>
+                        )}
 
                         {/* Opacity */}
                         <div>

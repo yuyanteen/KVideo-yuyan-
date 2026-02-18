@@ -11,7 +11,8 @@ import { AccountSettings } from '@/components/settings/AccountSettings';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
-import { AdminGate } from '@/components/AdminGate';
+import { PermissionGate } from '@/components/PermissionGate';
+import { hasPermission } from '@/lib/store/auth-store';
 import { useSettingsPage } from './hooks/useSettingsPage';
 
 export default function SettingsPage() {
@@ -64,7 +65,6 @@ export default function SettingsPage() {
   } = useSettingsPage();
 
   return (
-    <AdminGate>
     <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
       <div className="container mx-auto px-4 py-8 max-w-4xl space-y-8">
         {/* Header */}
@@ -74,20 +74,23 @@ export default function SettingsPage() {
         <AccountSettings />
 
         {/* Player Settings */}
-        <PlayerSettings
-          fullscreenType={fullscreenType}
-          onFullscreenTypeChange={handleFullscreenTypeChange}
-          proxyMode={proxyMode}
-          onProxyModeChange={handleProxyModeChange}
-          danmakuApiUrl={danmakuApiUrl}
-          onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
-          danmakuOpacity={danmakuOpacity}
-          onDanmakuOpacityChange={handleDanmakuOpacityChange}
-          danmakuFontSize={danmakuFontSize}
-          onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
-          danmakuDisplayArea={danmakuDisplayArea}
-          onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
-        />
+        <PermissionGate permission="player_settings">
+          <PlayerSettings
+            fullscreenType={fullscreenType}
+            onFullscreenTypeChange={handleFullscreenTypeChange}
+            proxyMode={proxyMode}
+            onProxyModeChange={handleProxyModeChange}
+            danmakuApiUrl={danmakuApiUrl}
+            onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
+            danmakuOpacity={danmakuOpacity}
+            onDanmakuOpacityChange={handleDanmakuOpacityChange}
+            danmakuFontSize={danmakuFontSize}
+            onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
+            danmakuDisplayArea={danmakuDisplayArea}
+            onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
+            showDanmakuApi={hasPermission('danmaku_api')}
+          />
+        </PermissionGate>
 
         {/* Display Settings */}
         <DisplaySettings
@@ -100,16 +103,18 @@ export default function SettingsPage() {
         />
 
         {/* Source Management */}
-        <SourceSettings
-          sources={sources}
-          onSourcesChange={handleSourcesChange}
-          onRestoreDefaults={() => setIsRestoreDefaultsDialogOpen(true)}
-          onAddSource={() => {
-            setEditingSource(null);
-            setIsAddModalOpen(true);
-          }}
-          onEditSource={handleEditSource}
-        />
+        <PermissionGate permission="source_management">
+          <SourceSettings
+            sources={sources}
+            onSourcesChange={handleSourcesChange}
+            onRestoreDefaults={() => setIsRestoreDefaultsDialogOpen(true)}
+            onAddSource={() => {
+              setEditingSource(null);
+              setIsAddModalOpen(true);
+            }}
+            onEditSource={handleEditSource}
+          />
+        </PermissionGate>
 
         {/* Sort Options */}
         <SortSettings
@@ -118,11 +123,13 @@ export default function SettingsPage() {
         />
 
         {/* Data Management */}
-        <DataSettings
-          onExport={() => setIsExportModalOpen(true)}
-          onImport={() => setIsImportModalOpen(true)}
-          onReset={() => setIsResetDialogOpen(true)}
-        />
+        <PermissionGate permission="data_management">
+          <DataSettings
+            onExport={() => setIsExportModalOpen(true)}
+            onImport={() => setIsImportModalOpen(true)}
+            onReset={() => setIsResetDialogOpen(true)}
+          />
+        </PermissionGate>
       </div>
 
       {/* Modals */}
@@ -175,6 +182,5 @@ export default function SettingsPage() {
         dangerous
       />
     </div>
-    </AdminGate>
   );
 }
