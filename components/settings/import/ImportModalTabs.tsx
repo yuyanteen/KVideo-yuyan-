@@ -15,7 +15,7 @@ export function ImportModalTabs({ activeTab, onTabChange }: ImportModalTabsProps
 
     return (
         <div className="relative mb-6">
-            <div className="flex border-b border-[var(--glass-border)] relative">
+            <div className="flex border-b border-[var(--glass-border)] relative overflow-x-auto whitespace-nowrap no-scrollbar w-full">
                 {tabs.map((tab) => (
                     <button
                         key={tab.id}

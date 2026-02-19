@@ -56,7 +56,7 @@ export function UserDanmakuSettings() {
       <div className="space-y-4">
         {/* Add form */}
         <form onSubmit={handleAdd} className="space-y-3">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <input
               type="text"
               placeholder="API 名称"
@@ -89,13 +89,11 @@ export function UserDanmakuSettings() {
           {/* System default option */}
           <button
             onClick={() => userSourcesStore.setActiveDanmakuApi(null)}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 bg-[var(--glass-bg)] border rounded-[var(--radius-2xl)] text-left transition-all cursor-pointer ${
-              activeId === null ? 'border-[var(--accent-color)] bg-[color-mix(in_srgb,var(--accent-color)_5%,transparent)]' : 'border-[var(--glass-border)]'
-            }`}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 bg-[var(--glass-bg)] border rounded-[var(--radius-2xl)] text-left transition-all cursor-pointer ${activeId === null ? 'border-[var(--accent-color)] bg-[color-mix(in_srgb,var(--accent-color)_5%,transparent)]' : 'border-[var(--glass-border)]'
+              }`}
           >
-            <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-              activeId === null ? 'border-[var(--accent-color)]' : 'border-[var(--glass-border)]'
-            }`}>
+            <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${activeId === null ? 'border-[var(--accent-color)]' : 'border-[var(--glass-border)]'
+              }`}>
               {activeId === null && <span className="w-2 h-2 rounded-full bg-[var(--accent-color)]" />}
             </span>
             <div className="min-w-0">
@@ -112,16 +110,14 @@ export function UserDanmakuSettings() {
           </button>
 
           {apis.map(api => (
-            <div key={api.id} className={`flex items-center gap-3 px-4 py-2.5 bg-[var(--glass-bg)] border rounded-[var(--radius-2xl)] ${
-              activeId === api.id ? 'border-[var(--accent-color)] bg-[color-mix(in_srgb,var(--accent-color)_5%,transparent)]' : 'border-[var(--glass-border)]'
-            }`}>
+            <div key={api.id} className={`flex items-center gap-3 px-4 py-2.5 bg-[var(--glass-bg)] border rounded-[var(--radius-2xl)] ${activeId === api.id ? 'border-[var(--accent-color)] bg-[color-mix(in_srgb,var(--accent-color)_5%,transparent)]' : 'border-[var(--glass-border)]'
+              }`}>
               <button
                 onClick={() => userSourcesStore.setActiveDanmakuApi(api.id)}
                 className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
               >
-                <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                  activeId === api.id ? 'border-[var(--accent-color)]' : 'border-[var(--glass-border)]'
-                }`}>
+                <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${activeId === api.id ? 'border-[var(--accent-color)]' : 'border-[var(--glass-border)]'
+                  }`}>
                   {activeId === api.id && <span className="w-2 h-2 rounded-full bg-[var(--accent-color)]" />}
                 </span>
                 <div className="min-w-0">

@@ -51,7 +51,7 @@ export function AccountSettings() {
     fetch('/api/auth')
       .then(res => res.json())
       .then(data => setHasAuth(data.hasAuth))
-      .catch(() => {});
+      .catch(() => { });
 
     // Fetch account list for admins
     fetch('/api/auth/accounts')
@@ -60,7 +60,7 @@ export function AccountSettings() {
         if (data.accounts) setAccounts(data.accounts);
         if (data.hasAdminPassword) setHasAdminPassword(data.hasAdminPassword);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleLogout = () => {
@@ -173,7 +173,7 @@ export function AccountSettings() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-full)] text-[var(--text-color-secondary)] hover:text-red-500 hover:border-red-500/30 transition-all duration-200 cursor-pointer"
@@ -206,12 +206,11 @@ export function AccountSettings() {
                       </div>
                       <span className="text-sm text-[var(--text-color)]">{account.name}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-[var(--radius-full)] ${
-                        account.role === 'super_admin' || account.role === 'admin'
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs px-2 py-0.5 rounded-[var(--radius-full)] ${account.role === 'super_admin' || account.role === 'admin'
                           ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
                           : 'bg-[var(--glass-bg)] text-[var(--text-color-secondary)] border border-[var(--glass-border)]'
-                      }`}>
+                        }`}>
                         {account.role === 'super_admin' ? '超级管理员' : account.role === 'admin' ? '管理员' : '观众'}
                       </span>
                       <button
@@ -233,7 +232,7 @@ export function AccountSettings() {
                 <p className="text-xs text-amber-400">
                   已标记移除 {removedAccounts.size} 个账户。请使用下方配置生成器生成新的 <code className="px-1 py-0.5 bg-black/20 rounded text-[10px]">ACCOUNTS</code> 环境变量值并更新部署配置。
                 </p>
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-2 flex-wrap">
                   <button
                     onClick={loadExistingAccounts}
                     className="text-xs px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-[var(--radius-2xl)] transition-colors cursor-pointer"
@@ -293,15 +292,14 @@ export function AccountSettings() {
                 {configEntries.map((entry, index) => (
                   <div key={index} className="flex gap-2 items-start">
                     <div className="flex-1 space-y-2">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <input
                           type="text"
                           placeholder="密码"
                           value={entry.password}
                           onChange={(e) => updateConfigEntry(index, 'password', e.target.value)}
-                          className={`flex-1 px-3 py-1.5 bg-[var(--glass-bg)] border rounded-[var(--radius-2xl)] text-sm text-[var(--text-color)] placeholder:text-[var(--text-color-secondary)]/50 focus:outline-none focus:border-[var(--accent-color)] ${
-                            !entry.password && entry.name ? 'border-amber-500/50' : 'border-[var(--glass-border)]'
-                          }`}
+                          className={`flex-1 px-3 py-1.5 bg-[var(--glass-bg)] border rounded-[var(--radius-2xl)] text-sm text-[var(--text-color)] placeholder:text-[var(--text-color-secondary)]/50 focus:outline-none focus:border-[var(--accent-color)] ${!entry.password && entry.name ? 'border-amber-500/50' : 'border-[var(--glass-border)]'
+                            }`}
                         />
                         <input
                           type="text"
@@ -368,7 +366,7 @@ export function AccountSettings() {
                     <label className="text-xs font-medium text-[var(--text-color)]">
                       生成的 ACCOUNTS 值：
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <code className="flex-1 px-3 py-2 bg-black/20 border border-[var(--glass-border)] rounded-[var(--radius-2xl)] text-xs text-[var(--text-color)] break-all select-all">
                         {generateAccountsString()}
                       </code>

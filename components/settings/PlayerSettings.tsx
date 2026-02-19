@@ -182,7 +182,7 @@ export function PlayerSettings({
                             <label className="block text-sm font-medium text-[var(--text-color)] mb-2">
                                 弹幕字号
                             </label>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap">
                                 {DANMAKU_FONT_SIZES.map((size) => (
                                     <button
                                         key={size}
@@ -203,7 +203,7 @@ export function PlayerSettings({
                             <label className="block text-sm font-medium text-[var(--text-color)] mb-2">
                                 弹幕显示区域
                             </label>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap">
                                 {DANMAKU_DISPLAY_AREAS.map(({ value, label }) => (
                                     <button
                                         key={value}
