@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getSession, clearSession, hasPermission, type Role } from '@/lib/store/auth-store';
+import { getSession, clearSession, hasPermission, type Role, type Permission } from '@/lib/store/auth-store';
 import { SettingsSection } from './SettingsSection';
 import { Icons } from '@/components/ui/Icon';
 import { LogOut, Shield, Info } from 'lucide-react';
@@ -9,13 +9,31 @@ import { LogOut, Shield, Info } from 'lucide-react';
 interface AccountInfo {
   name: string;
   role: Role;
+  customPermissions?: string[];
 }
 
 interface ConfigEntry {
   password: string;
   name: string;
   role: Role;
+  customPermissions: Permission[];
 }
+
+const ALL_PERMISSIONS: { key: Permission; label: string }[] = [
+  { key: 'source_management', label: '视频源管理' },
+  { key: 'account_management', label: '账户管理' },
+  { key: 'danmaku_api', label: '弹幕 API' },
+  { key: 'data_management', label: '数据管理' },
+  { key: 'player_settings', label: '播放器设置' },
+  { key: 'danmaku_appearance', label: '弹幕外观' },
+  { key: 'iptv_access', label: 'IPTV 访问' },
+];
+
+const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  super_admin: ['source_management', 'account_management', 'danmaku_api', 'data_management', 'player_settings', 'danmaku_appearance', 'view_settings', 'iptv_access'],
+  admin: ['player_settings', 'danmaku_appearance', 'view_settings', 'iptv_access'],
+  viewer: ['view_settings'],
+};
 
 export function AccountSettings() {
   const [session, setSessionState] = useState<ReturnType<typeof getSession>>(null);
@@ -54,12 +72,24 @@ export function AccountSettings() {
 
   // Config generator helpers
   const addConfigEntry = () => {
-    setConfigEntries([...configEntries, { password: '', name: '', role: 'viewer' }]);
+    setConfigEntries([...configEntries, { password: '', name: '', role: 'viewer', customPermissions: [] }]);
   };
 
   const updateConfigEntry = (index: number, field: keyof ConfigEntry, value: string) => {
     const updated = [...configEntries];
     updated[index] = { ...updated[index], [field]: value };
+    setConfigEntries(updated);
+  };
+
+  const toggleConfigPermission = (index: number, perm: Permission) => {
+    const updated = [...configEntries];
+    const entry = updated[index];
+    const perms = entry.customPermissions || [];
+    if (perms.includes(perm)) {
+      entry.customPermissions = perms.filter(p => p !== perm);
+    } else {
+      entry.customPermissions = [...perms, perm];
+    }
     setConfigEntries(updated);
   };
 
@@ -70,7 +100,17 @@ export function AccountSettings() {
   const generateAccountsString = () => {
     return configEntries
       .filter(e => e.password.trim() && e.name.trim())
-      .map(e => `${e.password}:${e.name}${e.role !== 'viewer' ? ':' + e.role : ''}`)
+      .map(e => {
+        let str = `${e.password}:${e.name}`;
+        const hasCustomPerms = e.customPermissions && e.customPermissions.length > 0;
+        if (e.role !== 'viewer' || hasCustomPerms) {
+          str += ':' + e.role;
+        }
+        if (hasCustomPerms) {
+          str += ':' + e.customPermissions.join('|');
+        }
+        return str;
+      })
       .join(',');
   };
 
@@ -92,6 +132,7 @@ export function AccountSettings() {
         password: '',
         name: a.name,
         role: a.role,
+        customPermissions: (a.customPermissions || []) as Permission[],
       }));
     setConfigEntries(existingEntries);
     setShowConfigGen(true);
@@ -279,6 +320,30 @@ export function AccountSettings() {
                           <option value="super_admin">超级管理员</option>
                         </select>
                       </div>
+                      {/* Custom permissions: show only those not in the selected role */}
+                      {(() => {
+                        const rolePerms = ROLE_PERMISSIONS[entry.role] || [];
+                        const extraPerms = ALL_PERMISSIONS.filter(p => !rolePerms.includes(p.key));
+                        if (extraPerms.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap gap-1.5 pl-1">
+                            {extraPerms.map(p => {
+                              const checked = entry.customPermissions?.includes(p.key) ?? false;
+                              return (
+                                <label key={p.key} className="flex items-center gap-1 text-[10px] text-[var(--text-color-secondary)] cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleConfigPermission(index, p.key)}
+                                    className="w-3 h-3 rounded accent-[var(--accent-color)]"
+                                  />
+                                  {p.label}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <button
                       onClick={() => removeConfigEntry(index)}
@@ -331,7 +396,7 @@ export function AccountSettings() {
             </p>
             <div className="text-xs text-[var(--text-color-secondary)] space-y-0.5">
               <p><code className="px-1 py-0.5 bg-[var(--glass-bg)] rounded text-[10px]">ADMIN_PASSWORD</code> — 单管理员密码</p>
-              <p><code className="px-1 py-0.5 bg-[var(--glass-bg)] rounded text-[10px]">ACCOUNTS</code> — 多账户（密码:名称[:角色]）</p>
+              <p><code className="px-1 py-0.5 bg-[var(--glass-bg)] rounded text-[10px]">ACCOUNTS</code> — 多账户（密码:名称[:角色[:权限1|权限2]]）</p>
             </div>
           </div>
         </div>

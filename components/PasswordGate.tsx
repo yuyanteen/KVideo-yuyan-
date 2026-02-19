@@ -80,6 +80,7 @@ export function PasswordGate({ children, hasAuth: initialHasAuth }: { children: 
                     profileId: data.profileId,
                     name: data.name,
                     role: data.role,
+                    customPermissions: data.customPermissions,
                 }, data.persistSession ?? persistSession);
 
                 // Reload to re-initialize stores with profiled keys

@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 function resolveUrl(base: string, relative: string): string {
   if (relative.startsWith('http://') || relative.startsWith('https://')) {
@@ -46,6 +46,8 @@ function rewriteM3u8(content: string, baseUrl: string, proxyBase: string): strin
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url');
+  const customUa = request.nextUrl.searchParams.get('ua');
+  const customReferer = request.nextUrl.searchParams.get('referer');
 
   if (!url) {
     return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 });
@@ -54,9 +56,9 @@ export async function GET(request: NextRequest) {
   try {
     const parsedUrl = new URL(url);
     const fetchHeaders: Record<string, string> = {
-      'User-Agent': 'Mozilla/5.0 (compatible; KVideo/1.0)',
+      'User-Agent': customUa || 'Mozilla/5.0 (compatible; KVideo/1.0)',
       'Accept': '*/*',
-      'Referer': `${parsedUrl.protocol}//${parsedUrl.host}/`,
+      'Referer': customReferer || `${parsedUrl.protocol}//${parsedUrl.host}/`,
       'Origin': `${parsedUrl.protocol}//${parsedUrl.host}`,
     };
 
@@ -66,7 +68,15 @@ export async function GET(request: NextRequest) {
       fetchHeaders['Range'] = rangeHeader;
     }
 
-    const response = await fetch(url, { headers: fetchHeaders });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(url, {
+      headers: fetchHeaders,
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
 
     if (!response.ok) {
       return NextResponse.json(
@@ -76,9 +86,46 @@ export async function GET(request: NextRequest) {
     }
 
     const contentType = response.headers.get('content-type') || '';
-    const isM3u8 = url.includes('.m3u8') ||
+    let isM3u8 = url.includes('.m3u8') ||
       contentType.includes('mpegurl') ||
       contentType.includes('x-mpegURL');
+
+    // If content-type is ambiguous, check the response body for M3U header
+    // Use clone() to avoid consuming the original body for binary streams
+    if (!isM3u8 && (contentType.includes('text/plain') || contentType.includes('application/octet-stream') || !contentType)) {
+      const cloned = response.clone();
+      const text = await cloned.text();
+      if (text.trimStart().startsWith('#EXTM3U') || text.trimStart().startsWith('#EXT-X-')) {
+        isM3u8 = true;
+      }
+      // For detected M3U8 from body check, process inline
+      if (isM3u8) {
+        const proxyBase = `/api/iptv/stream?${customUa ? `ua=${encodeURIComponent(customUa)}&` : ''}${customReferer ? `referer=${encodeURIComponent(customReferer)}&` : ''}url=`;
+        const rewritten = rewriteM3u8(text, url, proxyBase);
+        return new NextResponse(rewritten, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/vnd.apple.mpegurl',
+            'Cache-Control': 'no-cache',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': '*',
+          },
+        });
+      }
+      // Not M3U8, stream original binary body directly to preserve data integrity
+      const body = response.body;
+      return new NextResponse(body, {
+        status: response.status,
+        headers: {
+          'Content-Type': contentType || 'video/mp2t',
+          'Cache-Control': 'public, max-age=60',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+        },
+      });
+    }
 
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
@@ -89,7 +136,7 @@ export async function GET(request: NextRequest) {
     if (isM3u8) {
       // Parse and rewrite manifest
       const text = await response.text();
-      const proxyBase = `/api/iptv/stream?url=`;
+      const proxyBase = `/api/iptv/stream?${customUa ? `ua=${encodeURIComponent(customUa)}&` : ''}${customReferer ? `referer=${encodeURIComponent(customReferer)}&` : ''}url=`;
       const rewritten = rewriteM3u8(text, url, proxyBase);
 
       return new NextResponse(rewritten, {

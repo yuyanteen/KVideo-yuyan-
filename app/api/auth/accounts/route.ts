@@ -16,6 +16,7 @@ const effectiveAdminPassword = ADMIN_PASSWORD || ACCESS_PASSWORD;
 interface AccountInfo {
   name: string;
   role: 'super_admin' | 'admin' | 'viewer';
+  customPermissions?: string[];
 }
 
 function getAccountList(): AccountInfo[] {
@@ -37,8 +38,12 @@ function getAccountList(): AccountInfo[] {
           const name = parts[1].trim();
           const parsedRole = parts[2]?.trim();
           const role = parsedRole === 'super_admin' ? 'super_admin' : parsedRole === 'admin' ? 'admin' : 'viewer';
+          const perms = parts[3]?.trim();
+          const customPermissions = perms
+            ? perms.split('|').map(p => p.trim()).filter(p => p.length > 0)
+            : undefined;
           if (name) {
-            accounts.push({ name, role });
+            accounts.push({ name, role, ...(customPermissions && customPermissions.length > 0 ? { customPermissions } : {}) });
           }
         }
       });

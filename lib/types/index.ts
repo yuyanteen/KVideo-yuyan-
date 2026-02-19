@@ -51,6 +51,7 @@ export interface SourceBadge {
   id: string;
   name: string;
   count: number;
+  typeName?: string;
 }
 
 export interface TypeBadge {

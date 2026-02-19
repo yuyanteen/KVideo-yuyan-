@@ -8,6 +8,7 @@ import { Icons } from '@/components/ui/Icon';
 import { LatencyBadge } from '@/components/ui/LatencyBadge';
 import { Button } from '@/components/ui/Button';
 import { useKeyboardNavigation } from '@/lib/hooks/useKeyboardNavigation';
+import { settingsStore } from '@/lib/store/settings-store';
 
 interface Episode {
   name?: string;
@@ -20,6 +21,7 @@ export interface SourceInfo {
   sourceName?: string;
   latency?: number;
   pic?: string;
+  typeName?: string;
 }
 
 interface EpisodeListProps {
@@ -47,6 +49,7 @@ export function EpisodeList({
   const listRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [sourceExpanded, setSourceExpanded] = useState(false);
+  const [showAllSources, setShowAllSources] = useState(false);
 
   // Source latency state
   const [latencies, setLatencies] = useState<Record<string, number>>({});
@@ -70,6 +73,17 @@ export function EpisodeList({
     });
   }, [sources, latencies]);
 
+  // Resolve source ID to its actual baseUrl for pinging
+  const getSourcePingUrl = useCallback((sourceId: string): string | null => {
+    const settings = settingsStore.getSettings();
+    const allConfigs = [
+      ...settings.sources,
+      ...settings.premiumSources,
+    ];
+    const config = allConfigs.find(s => s.id === sourceId);
+    return config?.baseUrl || null;
+  }, []);
+
   // Initialize latencies from sources
   useEffect(() => {
     if (!sources) return;
@@ -91,10 +105,12 @@ export function EpisodeList({
         const results = await Promise.all(
           missing.map(async (source) => {
             try {
+              const pingUrl = getSourcePingUrl(source.source);
+              if (!pingUrl) return { source: source.source, latency: undefined };
               const response = await fetch('/api/ping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: source.source }),
+                body: JSON.stringify({ url: pingUrl }),
               });
               if (response.ok) {
                 const data = await response.json();
@@ -114,7 +130,7 @@ export function EpisodeList({
       };
       autoRefresh();
     }
-  }, [sources]);
+  }, [sources, getSourcePingUrl]);
 
   // Refresh latencies
   const refreshLatencies = useCallback(async () => {
@@ -124,10 +140,12 @@ export function EpisodeList({
     const results = await Promise.all(
       sources.map(async (source) => {
         try {
+          const pingUrl = getSourcePingUrl(source.source);
+          if (!pingUrl) return { source: source.source, latency: undefined };
           const response = await fetch('/api/ping', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: source.source }),
+            body: JSON.stringify({ url: pingUrl }),
           });
           if (response.ok) {
             const data = await response.json();
@@ -148,7 +166,7 @@ export function EpisodeList({
     });
     setLatencies(newLatencies);
     setIsLoadingLatency(false);
-  }, [sources]);
+  }, [sources, getSourcePingUrl]);
 
   // Memoized display episodes - reversed if toggle is on
   const displayEpisodes = useMemo(() => {
@@ -233,74 +251,184 @@ export function EpisodeList({
                   刷新延迟
                 </Button>
               </div>
-              <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
-                {sortedSources.map((source, index) => {
-                  const isCurrent = source.source === currentSource;
-                  const latency = latencies[source.source] ?? source.latency;
+              {(() => {
+                const MAX_VISIBLE = 5;
+                const visibleSources = showAllSources ? sortedSources : sortedSources.slice(0, MAX_VISIBLE);
+                const hasMoreSources = sortedSources.length > MAX_VISIBLE;
 
-                  return (
-                    <button
-                      key={`${source.source}-${index}`}
-                      onClick={() => {
-                        if (!isCurrent) {
-                          onSourceChange!(source);
-                          setSourceExpanded(false);
-                        }
-                      }}
-                      className={`
-                        w-full p-2.5 rounded-[var(--radius-2xl)] text-left transition-all duration-200
-                        flex items-center gap-2.5
-                        ${isCurrent
-                          ? 'bg-[var(--accent-color)] text-white shadow-[0_4px_12px_color-mix(in_srgb,var(--accent-color)_50%,transparent)]'
-                          : 'bg-[var(--glass-bg)] hover:bg-[var(--glass-hover)] text-[var(--text-color)] border border-[var(--glass-border)] cursor-pointer'
-                        }
-                      `}
-                      aria-current={isCurrent ? 'true' : undefined}
-                    >
-                      {source.pic && (
-                        <div className="w-10 h-14 rounded-[var(--radius-2xl)] overflow-hidden flex-shrink-0 bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)]">
-                          <Image
-                            src={source.pic}
-                            alt=""
-                            width={40}
-                            height={56}
-                            className="w-full h-full object-cover"
-                            unoptimized
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">
-                          {source.sourceName || source.source}
-                        </div>
-                        {latency !== undefined && (
-                          <div className="mt-0.5">
-                            <LatencyBadge latency={latency} />
+                // Group sources by typeName
+                const groupedByType = new Map<string, typeof visibleSources>();
+                for (const source of visibleSources) {
+                  const typeName = source.typeName || '';
+                  if (!groupedByType.has(typeName)) groupedByType.set(typeName, []);
+                  groupedByType.get(typeName)!.push(source);
+                }
+                const hasTypeGroups = groupedByType.size > 1 || (groupedByType.size === 1 && !groupedByType.has(''));
+
+                return (
+                  <>
+                    <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                      {hasTypeGroups ? (
+                        Array.from(groupedByType.entries()).map(([typeName, typeSources]) => (
+                          <div key={typeName || '__default'}>
+                            {typeName && (
+                              <div className="text-[10px] font-medium text-[var(--text-color-secondary)] uppercase tracking-wider px-2 pt-2 pb-1">
+                                {typeName}
+                              </div>
+                            )}
+                            {typeSources.map((source, index) => {
+                              const isCurrent = source.source === currentSource;
+                              const latency = latencies[source.source] ?? source.latency;
+                              const globalIndex = sortedSources.indexOf(source);
+
+                              return (
+                                <button
+                                  key={`${source.source}-${index}`}
+                                  onClick={() => {
+                                    if (!isCurrent) {
+                                      onSourceChange!(source);
+                                      setSourceExpanded(false);
+                                    }
+                                  }}
+                                  className={`
+                                    w-full p-2.5 rounded-[var(--radius-2xl)] text-left transition-all duration-200
+                                    flex items-center gap-2.5
+                                    ${isCurrent
+                                      ? 'bg-[var(--accent-color)] text-white shadow-[0_4px_12px_color-mix(in_srgb,var(--accent-color)_50%,transparent)]'
+                                      : 'bg-[var(--glass-bg)] hover:bg-[var(--glass-hover)] text-[var(--text-color)] border border-[var(--glass-border)] cursor-pointer'
+                                    }
+                                  `}
+                                  aria-current={isCurrent ? 'true' : undefined}
+                                >
+                                  {source.pic && (
+                                    <div className="w-10 h-14 rounded-[var(--radius-2xl)] overflow-hidden flex-shrink-0 bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)]">
+                                      <Image
+                                        src={source.pic}
+                                        alt=""
+                                        width={40}
+                                        height={56}
+                                        className="w-full h-full object-cover"
+                                        unoptimized
+                                        referrerPolicy="no-referrer"
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm truncate">
+                                      {source.sourceName || source.source}
+                                    </div>
+                                    {latency !== undefined && (
+                                      <div className="mt-0.5">
+                                        <LatencyBadge latency={latency} />
+                                      </div>
+                                    )}
+                                  </div>
+                                  {isCurrent && (
+                                    <Icons.Play size={14} className="flex-shrink-0" />
+                                  )}
+                                  {!isCurrent && globalIndex < 3 && (
+                                    <Badge
+                                      variant="secondary"
+                                      className={`flex-shrink-0 ${globalIndex === 0 ? 'bg-yellow-500/20 text-yellow-600 border-yellow-500' :
+                                        globalIndex === 1 ? 'bg-gray-400/20 text-gray-600 border-gray-400' :
+                                          'bg-orange-400/20 text-orange-600 border-orange-400'
+                                      }`}
+                                    >
+                                      #{globalIndex + 1}
+                                    </Badge>
+                                  )}
+                                </button>
+                              );
+                            })}
                           </div>
+                        ))
+                      ) : (
+                        visibleSources.map((source, index) => {
+                          const isCurrent = source.source === currentSource;
+                          const latency = latencies[source.source] ?? source.latency;
+
+                          return (
+                            <button
+                              key={`${source.source}-${index}`}
+                              onClick={() => {
+                                if (!isCurrent) {
+                                  onSourceChange!(source);
+                                  setSourceExpanded(false);
+                                }
+                              }}
+                              className={`
+                                w-full p-2.5 rounded-[var(--radius-2xl)] text-left transition-all duration-200
+                                flex items-center gap-2.5
+                                ${isCurrent
+                                  ? 'bg-[var(--accent-color)] text-white shadow-[0_4px_12px_color-mix(in_srgb,var(--accent-color)_50%,transparent)]'
+                                  : 'bg-[var(--glass-bg)] hover:bg-[var(--glass-hover)] text-[var(--text-color)] border border-[var(--glass-border)] cursor-pointer'
+                                }
+                              `}
+                              aria-current={isCurrent ? 'true' : undefined}
+                            >
+                              {source.pic && (
+                                <div className="w-10 h-14 rounded-[var(--radius-2xl)] overflow-hidden flex-shrink-0 bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)]">
+                                  <Image
+                                    src={source.pic}
+                                    alt=""
+                                    width={40}
+                                    height={56}
+                                    className="w-full h-full object-cover"
+                                    unoptimized
+                                    referrerPolicy="no-referrer"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm truncate">
+                                  {source.sourceName || source.source}
+                                </div>
+                                {latency !== undefined && (
+                                  <div className="mt-0.5">
+                                    <LatencyBadge latency={latency} />
+                                  </div>
+                                )}
+                              </div>
+                              {isCurrent && (
+                                <Icons.Play size={14} className="flex-shrink-0" />
+                              )}
+                              {!isCurrent && index < 3 && (
+                                <Badge
+                                  variant="secondary"
+                                  className={`flex-shrink-0 ${index === 0 ? 'bg-yellow-500/20 text-yellow-600 border-yellow-500' :
+                                    index === 1 ? 'bg-gray-400/20 text-gray-600 border-gray-400' :
+                                      'bg-orange-400/20 text-orange-600 border-orange-400'
+                                  }`}
+                                >
+                                  #{index + 1}
+                                </Badge>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                    {hasMoreSources && (
+                      <button
+                        onClick={() => setShowAllSources(!showAllSources)}
+                        className="w-full mt-1.5 py-1.5 text-xs text-[var(--text-color-secondary)] hover:text-[var(--accent-color)] flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                      >
+                        {showAllSources ? (
+                          <>收起 <Icons.ChevronDown size={12} className="rotate-180" /></>
+                        ) : (
+                          <>展开更多 ({sortedSources.length - MAX_VISIBLE}) <Icons.ChevronDown size={12} /></>
                         )}
-                      </div>
-                      {isCurrent && (
-                        <Icons.Play size={14} className="flex-shrink-0" />
-                      )}
-                      {!isCurrent && index < 3 && (
-                        <Badge
-                          variant="secondary"
-                          className={`flex-shrink-0 ${index === 0 ? 'bg-yellow-500/20 text-yellow-600 border-yellow-500' :
-                            index === 1 ? 'bg-gray-400/20 text-gray-600 border-gray-400' :
-                              'bg-orange-400/20 text-orange-600 border-orange-400'
-                          }`}
-                        >
-                          #{index + 1}
-                        </Badge>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

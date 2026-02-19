@@ -11,6 +11,8 @@ import { AccountSettings } from '@/components/settings/AccountSettings';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
+import { UserSourceSettings } from '@/components/settings/UserSourceSettings';
+import { UserDanmakuSettings } from '@/components/settings/UserDanmakuSettings';
 import { PermissionGate } from '@/components/PermissionGate';
 import { hasPermission } from '@/lib/store/auth-store';
 import { useSettingsPage } from './hooks/useSettingsPage';
@@ -101,6 +103,12 @@ export default function SettingsPage() {
           onSearchDisplayModeChange={handleSearchDisplayModeChange}
           onRememberScrollPositionChange={handleRememberScrollPositionChange}
         />
+
+        {/* Per-User Source Settings (visible to all logged-in users) */}
+        <UserSourceSettings />
+
+        {/* Per-User Danmaku Settings (visible to all logged-in users) */}
+        <UserDanmakuSettings />
 
         {/* Source Management */}
         <PermissionGate permission="source_management">

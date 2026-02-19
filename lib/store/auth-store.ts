@@ -25,6 +25,7 @@ export interface AuthSession {
   profileId: string;
   name: string;
   role: Role;
+  customPermissions?: Permission[];
 }
 
 const SESSION_KEY = 'kvideo-session';
@@ -76,7 +77,9 @@ export function isAdmin(): boolean {
 export function hasPermission(permission: Permission): boolean {
   const session = getSession();
   if (!session) return true; // No auth configured = full access
-  return ROLE_PERMISSIONS[session.role]?.includes(permission) ?? false;
+  if (ROLE_PERMISSIONS[session.role]?.includes(permission)) return true;
+  if (session.customPermissions?.includes(permission)) return true;
+  return false;
 }
 
 export function hasRole(minimumRole: Role): boolean {

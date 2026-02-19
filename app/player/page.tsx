@@ -51,6 +51,9 @@ function PlayerContent() {
     return null;
   }
 
+  // Handle auto-fallback when current source is unavailable (defined later, uses ref)
+  const sourceUnavailableRef = useRef<(() => void) | undefined>(undefined);
+
   const {
     videoData,
     loading,
@@ -61,7 +64,9 @@ function PlayerContent() {
     setPlayUrl,
     setVideoError,
     fetchVideoDetails,
-  } = useVideoPlayer(videoId, source, episodeParam, isReversed);
+  } = useVideoPlayer(videoId, source, episodeParam, isReversed, useCallback(() => {
+    sourceUnavailableRef.current?.();
+  }, []));
 
   // Parse grouped sources if available
   const [discoveredSources, setDiscoveredSources] = useState<SourceInfo[]>([]);
@@ -96,6 +101,27 @@ function PlayerContent() {
     }
     return sources;
   }, [groupedSourcesParam, source, videoId, videoData?.vod_pic, discoveredSources]);
+
+  // Wire up the source unavailable handler now that groupedSources is defined
+  sourceUnavailableRef.current = () => {
+    const alternatives = groupedSources.filter(s => s.source !== source);
+    if (alternatives.length === 0) return;
+
+    const best = [...alternatives].sort((a, b) => {
+      const latA = a.latency ?? Infinity;
+      const latB = b.latency ?? Infinity;
+      return latA - latB;
+    })[0];
+
+    const params = new URLSearchParams();
+    params.set('id', String(best.id));
+    params.set('source', best.source);
+    params.set('title', title || '');
+    if (episodeParam) params.set('episode', episodeParam);
+    if (groupedSourcesParam) params.set('groupedSources', groupedSourcesParam);
+    if (isPremium) params.set('premium', '1');
+    router.replace(`/player?${params.toString()}`, { scroll: false });
+  };
 
   // Background fetch alternative sources when none provided or when existing ones lack full info
   const fetchedSourcesRef = useRef(false);
@@ -161,6 +187,7 @@ function PlayerContent() {
                     sourceName: match.sourceDisplayName || getSourceName(match.source),
                     latency: match.latency,
                     pic: match.vod_pic,
+                    typeName: match.type_name,
                   });
                   // Update state incrementally
                   setDiscoveredSources([...found]);

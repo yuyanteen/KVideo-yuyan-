@@ -20,6 +20,7 @@ interface AccountEntry {
   password: string;
   name: string;
   role: 'super_admin' | 'admin' | 'viewer';
+  customPermissions: string[];
 }
 
 function parseAccounts(): AccountEntry[] {
@@ -31,12 +32,16 @@ function parseAccounts(): AccountEntry[] {
     .map(entry => {
       const parts = entry.split(':');
       if (parts.length < 2) return null;
-      const [password, name, role] = parts;
+      const [password, name, role, perms] = parts;
       const parsedRole = role?.trim();
+      const customPermissions = perms
+        ? perms.split('|').map(p => p.trim()).filter(p => p.length > 0)
+        : [];
       return {
         password: password.trim(),
         name: name.trim(),
         role: (parsedRole === 'super_admin' ? 'super_admin' : parsedRole === 'admin' ? 'admin' : 'viewer') as 'super_admin' | 'admin' | 'viewer',
+        customPermissions,
       };
     })
     .filter((a): a is AccountEntry => a !== null && a.password.length > 0 && a.name.length > 0);
@@ -96,6 +101,7 @@ export async function POST(request: NextRequest) {
           role: account.role,
           profileId,
           persistSession: PERSIST_SESSION,
+          customPermissions: account.customPermissions.length > 0 ? account.customPermissions : undefined,
         });
       }
     }

@@ -16,12 +16,12 @@ const HLS_LIVE_CONFIG: Partial<Hls['config']> = {
   lowLatencyMode: true,
   liveDurationInfinity: true,
   manifestLoadingTimeOut: 10000,
-  manifestLoadingMaxRetry: 2,
+  manifestLoadingMaxRetry: 3,
   levelLoadingTimeOut: 10000,
-  fragLoadingTimeOut: 15000,
+  fragLoadingTimeOut: 20000,
 };
 
-const LOADING_TIMEOUT_MS = 20000;
+const LOADING_TIMEOUT_MS = 30000;
 
 interface IPTVPlayerProps {
   channel: M3UChannel;
@@ -30,8 +30,12 @@ interface IPTVPlayerProps {
   onChannelChange: (channel: M3UChannel) => void;
 }
 
-function getProxiedUrl(url: string): string {
-  return `/api/iptv/stream?url=${encodeURIComponent(url)}`;
+function getProxiedUrl(url: string, ua?: string, referer?: string): string {
+  let proxyUrl = `/api/iptv/stream?`;
+  if (ua) proxyUrl += `ua=${encodeURIComponent(ua)}&`;
+  if (referer) proxyUrl += `referer=${encodeURIComponent(referer)}&`;
+  proxyUrl += `url=${encodeURIComponent(url)}`;
+  return proxyUrl;
 }
 
 function formatTime(seconds: number): string {
@@ -54,6 +58,8 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
   const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sidebarVisibleCount, setSidebarVisibleCount] = useState(100);
   const [isLoading, setIsLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -161,7 +167,7 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
     video.removeAttribute('src');
     video.load();
 
-    const proxiedUrl = getProxiedUrl(url);
+    const proxiedUrl = getProxiedUrl(url, channel.httpUserAgent, channel.httpReferrer);
 
     // Global loading timeout
     let loadingResolved = false;
@@ -309,7 +315,7 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
         }, { once: true });
       }, { once: true });
     }
-  }, []);
+  }, [channel.httpUserAgent, channel.httpReferrer]);
 
   // Load on channel/route change
   useEffect(() => {
@@ -433,10 +439,19 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
   const VolumeIcon = isMuted || volume === 0 ? Icons.VolumeX : volume < 0.5 ? Icons.Volume1 : Icons.Volume2;
 
   const filteredSidebarChannels = useMemo(() => {
-    if (!sidebarSearch.trim()) return channels;
-    const q = sidebarSearch.toLowerCase().trim();
+    if (!debouncedSearch.trim()) return channels;
+    const q = debouncedSearch.toLowerCase().trim();
     return channels.filter(ch => ch.name.toLowerCase().includes(q));
-  }, [channels, sidebarSearch]);
+  }, [channels, debouncedSearch]);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(sidebarSearch);
+      setSidebarVisibleCount(100);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [sidebarSearch]);
 
   return (
     <div
@@ -655,7 +670,7 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
             </div>
           </div>
           <div className="p-1">
-            {filteredSidebarChannels.map((ch, i) => {
+            {filteredSidebarChannels.slice(0, sidebarVisibleCount).map((ch, i) => {
               const isActive = ch.name === channel.name && ch.url === channel.url;
               return (
                 <button
@@ -692,6 +707,17 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange }: IPTV
                 </button>
               );
             })}
+            {filteredSidebarChannels.length > sidebarVisibleCount && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSidebarVisibleCount(prev => prev + 100);
+                }}
+                className="w-full py-2 text-xs text-white/50 hover:text-white/80 transition-colors cursor-pointer"
+              >
+                显示更多 ({filteredSidebarChannels.length - sidebarVisibleCount} 个频道)
+              </button>
+            )}
           </div>
         </div>
       )}

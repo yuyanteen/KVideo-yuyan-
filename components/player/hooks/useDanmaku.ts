@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { settingsStore } from '@/lib/store/settings-store';
+import { userSourcesStore } from '@/lib/store/user-sources-store';
 import { parseDanmakuResponse, parseSearchResults, matchEpisode, fuzzyMatchTitle } from '@/lib/utils/danmaku-utils';
 import type { DanmakuComment } from '@/lib/types/danmaku';
 
@@ -27,18 +28,22 @@ export function useDanmaku({ videoTitle, episodeName, episodeIndex }: UseDanmaku
   const [error, setError] = useState<string | null>(null);
   const fetchedKeyRef = useRef('');
 
-  // Sync with settings store
+  // Sync with settings store + user danmaku API override
   useEffect(() => {
-    const s = settingsStore.getSettings();
-    setDanmakuEnabledState(s.danmakuEnabled);
-    setApiUrl(s.danmakuApiUrl);
+    const updateApi = () => {
+      const s = settingsStore.getSettings();
+      setDanmakuEnabledState(s.danmakuEnabled);
 
-    const unsub = settingsStore.subscribe(() => {
-      const ns = settingsStore.getSettings();
-      setDanmakuEnabledState(ns.danmakuEnabled);
-      setApiUrl(ns.danmakuApiUrl);
-    });
-    return unsub;
+      // User's active danmaku API takes priority over system setting
+      const userApi = userSourcesStore.getActiveDanmakuApi();
+      setApiUrl(userApi ? userApi.url : s.danmakuApiUrl);
+    };
+
+    updateApi();
+
+    const unsub1 = settingsStore.subscribe(updateApi);
+    const unsub2 = userSourcesStore.subscribe(updateApi);
+    return () => { unsub1(); unsub2(); };
   }, []);
 
   const setDanmakuEnabled = useCallback((v: boolean) => {
