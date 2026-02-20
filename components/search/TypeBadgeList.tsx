@@ -11,6 +11,8 @@ import { Icons } from '@/components/ui/Icon';
 import { TypeBadgeItem } from './TypeBadgeItem';
 import { useKeyboardNavigation } from '@/lib/hooks/useKeyboardNavigation';
 
+const TYPE_EXPAND_KEY = 'kvideo_type_badges_expanded';
+
 interface TypeBadge {
   type: string;
   count: number;
@@ -23,7 +25,11 @@ interface TypeBadgeListProps {
 }
 
 export function TypeBadgeList({ badges, selectedTypes, onToggleType }: TypeBadgeListProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem(TYPE_EXPAND_KEY);
+    return saved !== 'false'; // default to expanded
+  });
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [hasOverflow, setHasOverflow] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,7 +82,7 @@ export function TypeBadgeList({ badges, selectedTypes, onToggleType }: TypeBadge
         role="group"
         aria-label="类型筛选"
       >
-        <div className={`relative transition-all duration-300 z-10 ${!isExpanded ? 'max-h-[50px] overflow-hidden' : 'overflow-visible'
+        <div className={`relative transition-[max-height] duration-300 z-10 ${!isExpanded ? 'max-h-[50px] overflow-hidden' : 'overflow-visible'
           }`}>
           <div
             ref={badgeContainerRef}
@@ -98,7 +104,13 @@ export function TypeBadgeList({ badges, selectedTypes, onToggleType }: TypeBadge
         </div>
         {hasOverflow && (
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() => {
+              setIsExpanded(prev => {
+                const next = !prev;
+                localStorage.setItem(TYPE_EXPAND_KEY, String(next));
+                return next;
+              });
+            }}
             className="mt-2 text-xs text-[var(--text-color-secondary)] hover:text-[var(--accent-color)]
                      flex items-center gap-1 transition-colors self-start cursor-pointer"
           >

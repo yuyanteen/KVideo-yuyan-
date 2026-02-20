@@ -102,7 +102,7 @@ export function IPTVSourceManager() {
           />
           <input
             type="text"
-            placeholder="M3U 链接地址"
+            placeholder="M3U / JSON 链接地址"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             {...inputProps}
@@ -129,7 +129,7 @@ export function IPTVSourceManager() {
       {/* Source List */}
       {sources.length === 0 ? (
         <div className="text-center py-8 text-sm text-[var(--text-color-secondary)]">
-          暂无直播源，请添加 M3U 播放列表链接
+          暂无直播源，请添加 M3U 或 JSON 播放列表链接
         </div>
       ) : (
         <div className="space-y-2">

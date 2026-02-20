@@ -53,6 +53,7 @@ function PlayerContent() {
 
   // Handle auto-fallback when current source is unavailable (defined later, uses ref)
   const sourceUnavailableRef = useRef<(() => void) | undefined>(undefined);
+  const pendingFallbackRef = useRef(false);
 
   const {
     videoData,
@@ -99,14 +100,26 @@ function PlayerContent() {
         pic: videoData?.vod_pic
       });
     }
+
+    // Use current video's poster as fallback pic for sources that don't have one
+    const fallbackPic = videoData?.vod_pic;
+    if (fallbackPic) {
+      sources = sources.map(s => s.pic ? s : { ...s, pic: fallbackPic });
+    }
+
     return sources;
   }, [groupedSourcesParam, source, videoId, videoData?.vod_pic, discoveredSources]);
 
   // Wire up the source unavailable handler now that groupedSources is defined
   sourceUnavailableRef.current = () => {
     const alternatives = groupedSources.filter(s => s.source !== source);
-    if (alternatives.length === 0) return;
+    if (alternatives.length === 0) {
+      // No alternatives yet — mark pending so we retry when discovered sources arrive
+      pendingFallbackRef.current = true;
+      return;
+    }
 
+    pendingFallbackRef.current = false;
     const best = [...alternatives].sort((a, b) => {
       const latA = a.latency ?? Infinity;
       const latB = b.latency ?? Infinity;
@@ -123,6 +136,13 @@ function PlayerContent() {
     router.replace(`/player?${params.toString()}`, { scroll: false });
   };
 
+  // Retry pending fallback when discovered sources arrive
+  useEffect(() => {
+    if (pendingFallbackRef.current && discoveredSources.length > 0) {
+      sourceUnavailableRef.current?.();
+    }
+  }, [discoveredSources]);
+
   // Background fetch alternative sources when none provided or when existing ones lack full info
   const fetchedSourcesRef = useRef(false);
   useEffect(() => {
@@ -133,7 +153,8 @@ function PlayerContent() {
     if (groupedSourcesParam) {
       try { existingSources = JSON.parse(groupedSourcesParam); } catch {}
     }
-    const hasFullInfo = existingSources.length > 1 &&
+    // Always fetch alternatives if there's a pending fallback (source unavailable)
+    const hasFullInfo = !pendingFallbackRef.current && existingSources.length > 1 &&
       existingSources.every(s => s.pic || s.latency !== undefined);
     if (hasFullInfo) return;
 

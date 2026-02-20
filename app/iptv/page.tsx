@@ -119,6 +119,8 @@ export default function IPTVPage() {
             onClose={() => setActiveChannel(null)}
             channels={cachedChannels}
             onChannelChange={setActiveChannel}
+            channelsBySource={cachedChannelsBySource}
+            sources={sources}
           />
         )}
       </div>
