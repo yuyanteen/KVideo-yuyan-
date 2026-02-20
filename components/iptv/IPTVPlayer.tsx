@@ -688,7 +688,7 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange, channe
           <div className="absolute inset-0 flex items-center justify-center bg-black/80">
             <div className="text-center" data-controls>
               <p className="text-red-400 text-sm mb-3">{error}</p>
-              <div className="flex gap-2 justify-center">
+              <div className="flex gap-2 flex-wrap justify-center">
                 <button
                   onClick={(e) => { e.stopPropagation(); loadChannel(currentUrl); }}
                   className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm transition-colors cursor-pointer"

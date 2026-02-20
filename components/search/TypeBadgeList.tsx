@@ -36,6 +36,14 @@ export function TypeBadgeList({ badges, selectedTypes, onToggleType }: TypeBadge
   const badgeContainerRef = useRef<HTMLDivElement>(null);
   const badgeRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => {
+      const next = !prev;
+      localStorage.setItem(TYPE_EXPAND_KEY, String(next));
+      return next;
+    });
+  }, []);
+
   // Keyboard navigation
   useKeyboardNavigation({
     enabled: true,
@@ -58,7 +66,8 @@ export function TypeBadgeList({ badges, selectedTypes, onToggleType }: TypeBadge
     }, [badges, onToggleType]),
   });
 
-  // Check if content has overflow on mount and when badges change
+  // Check if content has overflow on mount and when badge count changes
+  const hasCheckedOverflow = useRef(false);
   useEffect(() => {
     const checkOverflow = () => {
       if (badgeContainerRef.current) {
@@ -68,10 +77,13 @@ export function TypeBadgeList({ badges, selectedTypes, onToggleType }: TypeBadge
     };
 
     checkOverflow();
-    // Recheck after a short delay to account for animations
-    const timeout = setTimeout(checkOverflow, 100);
-    return () => clearTimeout(timeout);
-  }, [badges]);
+    // Only do delayed recheck on first measurement
+    if (!hasCheckedOverflow.current) {
+      hasCheckedOverflow.current = true;
+      const timeout = setTimeout(checkOverflow, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [badges.length]);
 
   return (
     <>
@@ -104,13 +116,7 @@ export function TypeBadgeList({ badges, selectedTypes, onToggleType }: TypeBadge
         </div>
         {hasOverflow && (
           <button
-            onClick={() => {
-              setIsExpanded(prev => {
-                const next = !prev;
-                localStorage.setItem(TYPE_EXPAND_KEY, String(next));
-                return next;
-              });
-            }}
+            onClick={toggleExpanded}
             className="mt-2 text-xs text-[var(--text-color-secondary)] hover:text-[var(--accent-color)]
                      flex items-center gap-1 transition-colors self-start cursor-pointer"
           >

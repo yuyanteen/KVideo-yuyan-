@@ -561,18 +561,13 @@ docker run -d -p 3000:3000 \
    - **Build output directory**: 输入 `.vercel/output/static`
    - 点击 **Save and Deploy**。
 
-4. **关键步骤：修复运行时环境**
-   > *注意：此时部署虽然显示"Success"，但你会发现访问网页会报错。这是因为缺少必要的兼容性配置。请按以下步骤修复：*
+4. **等待部署完成**：
+   > 项目已内置 `wrangler.toml` 配置文件，其中包含 `nodejs_compat` 兼容性标志，无需手动配置。
 
-   - 进入 **[项目设置页面](https://dash.cloudflare.com/?to=/:account/pages/view/kvideo/settings/production)** (如果你的项目名不是 kvideo，请在控制台手动查找 Settings -> Functions)。
-   - 拉到页面底部找到 **Compatibility flags** 部分。
-   - 添加标志：`nodejs_compat`
-
-5. **重试部署 (生效配置)**：
-   - 回到 **[项目概览页面](https://dash.cloudflare.com/?to=/:account/pages/view/kvideo)**。
-   - 在 **Deployments** 列表中，找到最新的那次部署。
-   - 点击右侧的三个点 `...` 菜单，选择 **Retry deployment**。
-   - 等待新的部署完成后，你的 KVideo 就部署成功了！
+5. **如果部署失败**：
+   > 如果看到 `Unknown internal error occurred` 错误，这通常是 Cloudflare 的临时服务端问题。请在 **Deployments** 列表中找到最新部署，点击 `...` 菜单选择 **Retry deployment** 重试即可。
+   >
+   > 如果首次部署仍有问题，可尝试在 **[项目设置页面](https://dash.cloudflare.com/?to=/:account/pages/view/kvideo/settings/production)** 底部的 **Compatibility flags** 中手动添加 `nodejs_compat`，然后重新部署。
 
 #### 选项 3：Docker 部署
 
@@ -672,6 +667,8 @@ npm start
    或通过 U 盘、文件管理器等方式侧载安装。
 
 > **注意**：此 APK 是一个 WebView 壳应用，需要你的 KVideo 实例已经部署并可访问。APK 本身不包含 KVideo 代码，仅作为 TV 端的浏览器入口。
+>
+> **最低系统要求**：Android 8.0 (API 26) 及以上。Android 7.0 及更低版本的 WebView 不支持本项目使用的 ES2017+ JavaScript 特性和现代 CSS，可能导致白屏。如遇白屏问题，请升级系统 WebView 或使用 Android 8.0+ 设备。
 
 #### 选项 6：Apple TV 应用构建
 
@@ -738,6 +735,34 @@ npm start
 ```
 
 > **自动化部署**：本项目使用 GitHub Actions 自动构建和发布 Docker 镜像。每次代码推送到 main 分支时，会自动构建多架构镜像并推送到 Docker Hub。
+
+## 常见问题
+
+### Cloudflare Pages 部署报 "Unknown internal error"
+
+这是 Cloudflare 的临时服务端错误，与代码无关。请在 Deployments 列表中重试部署即可。项目已内置 `wrangler.toml` 配置 `nodejs_compat` 兼容性标志。
+
+### IPv6 环境下 HTTPS 访问视频无法播放
+
+如果你的网络使用 IPv6 访问，且通过路由器端口映射（如 20443 → 443），请确保：
+- 反向代理（如 Caddy/Nginx）正确监听 IPv6 地址
+- 路由器的 IPv6 端口映射规则与 IPv4 一致
+- 如使用非标准端口，确保 IPv6 防火墙规则也已放行
+
+这是网络/反向代理配置问题，非 KVideo 代码问题。
+
+### Android 7.0 设备白屏
+
+Android 7.0 (API 24) 的 WebView 基于 Chrome 51，不支持本项目使用的现代 JavaScript（ES2017+）和 CSS 特性。最低要求 Android 8.0 (API 26) 及以上。
+
+### IPTV 部分直播流无法播放
+
+浏览器原生仅支持 HLS (m3u8) 和部分 MP4/WebM 格式。以下格式在浏览器中不受支持：
+- RTMP/RTSP 流（需要专用播放器如 VLC/PotPlayer）
+- 某些加密或受 DRM 保护的流
+- 需要特定客户端验证的流
+
+KVideo 已内置代理服务器自动处理 CORS 问题和 HLS URL 重写，大部分 HLS 直播流应能正常播放。
 
 ## 贡献代码
 

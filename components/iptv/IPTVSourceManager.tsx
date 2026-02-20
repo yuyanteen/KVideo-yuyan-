@@ -70,7 +70,7 @@ export function IPTVSourceManager() {
         <h3 className="text-sm font-medium text-[var(--text-color)]">
           直播源管理
         </h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => refreshSources()}
             disabled={isLoading || sources.length === 0}
